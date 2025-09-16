@@ -37,7 +37,7 @@ void Fan_Init(void);
 void Fan_Start(void);
 void Fan_Stop(void);
 void Fan_SetDutyCycle(uint8_t duty);
-void Fan_SetTargetRPM(uint16_t rpm);
+//void Fan_SetTargetRPM(uint16_t rpm);
 
 // ×´Ì¬»ñÈ¡º¯Êý
 uint16_t Fan_GetRPM(void);

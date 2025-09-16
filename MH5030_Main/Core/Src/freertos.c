@@ -38,6 +38,8 @@
 #include "ntc.h"
 #include "pid.h"
 #include "fan_control.h"
+#include "iwdg.h"
+#include "key.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -70,7 +72,7 @@ osThreadId Wdg_TaskHandle;
 
 /* USER CODE END FunctionPrototypes */
 
-void heaterctrl_task(void const * argument);
+void StartDefaultTask(void const * argument);
 void fan_task(void const * argument);
 void tcouple_task(void const * argument);
 void ds18b20_task(void const * argument);
@@ -122,7 +124,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of HeaterCtrl_Task */
-  osThreadDef(HeaterCtrl_Task, heaterctrl_task, osPriorityAboveNormal, 0, 128);
+  osThreadDef(HeaterCtrl_Task, StartDefaultTask, osPriorityAboveNormal, 0, 128);
   HeaterCtrl_TaskHandle = osThreadCreate(osThread(HeaterCtrl_Task), NULL);
 
   /* definition and creation of Fan_Task */
@@ -130,15 +132,15 @@ void MX_FREERTOS_Init(void) {
   Fan_TaskHandle = osThreadCreate(osThread(Fan_Task), NULL);
 
   /* definition and creation of TCouple_Task */
-  osThreadDef(TCouple_Task, tcouple_task, osPriorityNormal, 0, 128);
+  osThreadDef(TCouple_Task, tcouple_task, osPriorityIdle, 0, 128);
   TCouple_TaskHandle = osThreadCreate(osThread(TCouple_Task), NULL);
 
   /* definition and creation of DS18B20_Task */
-  osThreadDef(DS18B20_Task, ds18b20_task, osPriorityNormal, 0, 128);
+  osThreadDef(DS18B20_Task, ds18b20_task, osPriorityIdle, 0, 128);
   DS18B20_TaskHandle = osThreadCreate(osThread(DS18B20_Task), NULL);
 
   /* definition and creation of Wdg_Task */
-  osThreadDef(Wdg_Task, wdg_task, osPriorityHigh, 0, 64);
+  osThreadDef(Wdg_Task, wdg_task, osPriorityIdle, 0, 64);
   Wdg_TaskHandle = osThreadCreate(osThread(Wdg_Task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -147,22 +149,22 @@ void MX_FREERTOS_Init(void) {
 
 }
 
-/* USER CODE BEGIN Header_heaterctrl_task */
+/* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the HeaterCtrl_Task thread.
+  * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_heaterctrl_task */
-void heaterctrl_task(void const * argument)
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void const * argument)
 {
-  /* USER CODE BEGIN heaterctrl_task */
+  /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
   for(;;)
   {
     osDelay(1);
   }
-  /* USER CODE END heaterctrl_task */
+  /* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Header_fan_task */

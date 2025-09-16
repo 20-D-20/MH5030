@@ -2,9 +2,9 @@
 
 /*Ds18b20全局变量*/
 
-Ds18b20Sensor_t ds18b20_1;
+Ds18b20Sensor_t g_stDs18b20_1 = {0};
 //Ds18b20Sensor_t ds18b20_2;
-OneWire_t OneWire_1;
+OneWire_t g_stOneWire_1 = {0};
 //OneWire_t OneWire_2;
 
 /**
@@ -46,6 +46,7 @@ bool Ds18b20_ManualConvert(Ds18b20Sensor_t *ds18b20, OneWire_t *OneWire)
     if (!done)
     {
         ds18b20->DataIsValid = false;                                    /* 超时：数据无效 */
+        ds18b20->error_count ++ ;
         return false;
     }
 
@@ -55,7 +56,7 @@ bool Ds18b20_ManualConvert(Ds18b20Sensor_t *ds18b20, OneWire_t *OneWire)
     ds18b20->DataIsValid = ok;                                           /* 标记有效性 */
     if (ok)
     {
-        ds18b20->Temperature = t;                                        /* 仅成功时更新 */
+        ds18b20->Temperature = t ;                                        /* 仅成功时更新 */
     }
     return ok;
 }

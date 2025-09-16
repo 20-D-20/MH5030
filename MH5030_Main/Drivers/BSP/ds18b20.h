@@ -15,6 +15,7 @@ typedef struct
     uint8_t Address[8];   /* 64-bit ROM 地址，LSB 在前 */
     float   Temperature;  /* 最近一次读取的温度值（℃） */
     bool    DataIsValid;  /* 最近一次读取的数据是否有效 */
+    uint32_t error_count; /* 错误计数 */
 } Ds18b20Sensor_t;
 
 /* -------------------------------------------------------------------------------------- */
@@ -24,13 +25,13 @@ typedef struct
 /**
  * @brief      外部 DS18B20 设备句柄（示例：两路）
  */
-extern Ds18b20Sensor_t ds18b20_1;
+extern Ds18b20Sensor_t g_stDs18b20_1;
 //extern Ds18b20Sensor_t ds18b20_2;
 
 /**
  * @brief      外部 OneWire 总线句柄（示例：两路）
  */
-extern OneWire_t OneWire_1;
+extern OneWire_t g_stOneWire_1;
 //extern OneWire_t OneWire_2;
 
 /* -------------------------------------------------------------------------------------- */
@@ -93,7 +94,7 @@ typedef enum
 } DS18B20_Resolution_t;
 
 /* -------------------------------------------------------------------------------------- */
-/* API 声明（Doxygen 风格头部注释）                                                        */
+/* API 声明                                                                             */
 /* -------------------------------------------------------------------------------------- */
 
 /**
@@ -148,3 +149,4 @@ uint8_t DS18B20_SetResolution(OneWire_t *OneWireStruct, DS18B20_Resolution_t res
 uint8_t DS18B20_AllDone(OneWire_t *OneWireStruct);
 
 #endif /* _DS18B20_H */
+

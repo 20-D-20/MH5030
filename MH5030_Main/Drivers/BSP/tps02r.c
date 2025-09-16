@@ -114,7 +114,6 @@ int tps02r_get_temp(int8_t chan, float *p_data)
 }
 
 
-
 /**
  * @brief      设置通道的上限温度值
  * 

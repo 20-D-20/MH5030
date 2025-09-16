@@ -104,11 +104,11 @@ typedef struct TuneObject {
 
 /* ---------------------- 全局变量声明区域 ---------------------- */
 
-extern PidType g_stPid1;;                       /* PID控制器全局实例 */
-extern TuneObjectType g_stPid1Auto;             /* PID自整定对象全局实例 */
+extern PidType g_stPidFront;;                       /* PID控制器全局实例 */
+extern TuneObjectType g_stPidFrontAuto;             /* PID自整定对象全局实例 */
 extern FilterCtx g_stFilter1;                   /* 前枪管滤波器结构体 */
-extern PidType g_stPid2;;                       /* PID控制器全局实例 */
-extern TuneObjectType g_stPid2Auto;             /* PID自整定对象全局实例 */       
+extern PidType g_stPidRear;;                       /* PID控制器全局实例 */
+extern TuneObjectType g_stPidRearAuto;             /* PID自整定对象全局实例 */       
 extern FilterCtx g_stFilter2;                   /* 腔体滤波器结构体 */
 
 /* ---------------------- 函数声明区域 ---------------------- */

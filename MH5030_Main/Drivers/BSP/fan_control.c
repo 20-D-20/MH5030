@@ -99,10 +99,7 @@ void Fan_Start(void)
     {
         // 打开风扇电源 (FCTR = 0)
         HAL_GPIO_WritePin(FCTR_GPIO_Port, FCTR_Pin, GPIO_PIN_RESET);
-        
-        // 延时等待风扇启动
-        delay_ms(100);
-        
+      
         // 设置目标占空比
         Fan_SetDutyCycle(fan.duty_cycle);
         fan.enable = 1;

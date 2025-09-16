@@ -41,6 +41,7 @@
 #include "ntc.h"
 #include "pid.h"
 #include "fan_control.h"
+#include "key.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -111,37 +112,36 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
-  MX_IWDG_Init();
+//  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   
   delay_init(72);                     
   
-/*-------------------------------------���ٷ�����������----------------------------------------------*/
+/*-------------------------------------FAN TEST PROGRAM----------------------------------------------*/
 
 //  HAL_TIM_PWM_Start (&htim3, TIM_CHANNEL_1);
 //  HAL_GPIO_WritePin (GPIOB,GPIO_PIN_3,GPIO_PIN_RESET);
-
   Fan_Init();
   Fan_Start();
   Filter_Init_All();
 //  Filter_Test();
-/*-------------------------------------���ٷ�����������----------------------------------------------*/
+/*-------------------------------------FAN TEST PROGRAM----------------------------------------------*/
   
-/*-------------------------------------PWM���ȶ˿ڲ���----------------------------------------------*/
+/*-------------------------------------PWM TEST PROGRAM----------------------------------------------*/
 
 //  HAL_TIM_PWM_Start (&htim1, TIM_CHANNEL_2);
 //  HAL_TIM_PWM_Start (&htim4, TIM_CHANNEL_4);
 
-/*-------------------------------------PWM���ȶ˿ڲ���----------------------------------------------*/
+/*-------------------------------------PWM TEST PROGRAM----------------------------------------------*/
 
 
-/*-------------------------------------MAX6675��������----------------------------------------------*/
+/*-------------------------------------MAX6675 TEST PROGRAM------------------------------------------*/
 //  MAX6675_Setup();
 //  Temperature_Monitor_Task();
-/*-------------------------------------MAX6675��������----------------------------------------------*/
+/*-------------------------------------MAX6675 TEST PROGRAM------------------------------------------*/
   
   
-/*-------------------------------------ds18b2��������----------------------------------------------*/
+/*-------------------------------------ds18b20 test program------------------------------------------*/
 //  u8 error = 0; 
 //  OneWire_Init(&OneWire_2,DS18B20_2_GPIO_Port, DS18B20_2_Pin); 
 //  error=OneWire_Reset(&OneWire_2);
@@ -153,10 +153,10 @@ int main(void)
 //  {
 //      printf("error!!!\n");
 //  }
-/*-------------------------------------ds18b2��������----------------------------------------------*/
+/*-------------------------------------ds18b20 test program-------------------------------------------*/
 
   
-/*-------------------------------------TPS02R��������----------------------------------------------*/
+/*-------------------------------------TPS02R test program----------------------------------------------*/
 //  u8 error = 0;                                                             
 //  tps02r_iic_init(&tps02r_iicmanger);                                        
 //  error=tps02r_cfg_init();
@@ -167,10 +167,10 @@ int main(void)
 //  {
 //      printf("error!!!\n");
 //  }
-/*-------------------------------------TPS02R��������----------------------------------------------*/
+/*-------------------------------------TPS02R test program----------------------------------------------*/
   
   
-/*-------------------------------------FM24CXX��������----------------------------------------------*/
+/*-------------------------------------FM24CXX test program----------------------------------------------*/
 //  FM24CXX_iic_init(&fm24cxx_iicmanager);
 //  printf("test\r\n");
 //  if(FM_Check()==0)
@@ -179,23 +179,23 @@ int main(void)
 //  }
 //  char result = FM_ReadOneByte(EE_TYPE);
 //  printf("result = %d ",result);
-/*-------------------------------------FM24CXX��������----------------------------------------------*/
+/*-------------------------------------FM24CXX test program----------------------------------------------*/
 
   
-/*-------------------------------------��Ļ��������----------------------------------------------*/
+/*-------------------------------------SSD1305 test program----------------------------------------------*/
   SSD1305_init();                                       
   clearscreen();                                        
   Disp_Char(0, 10, 'A', false);                         
   DispString(0, 20, (unsigned char*)"Hello", false);    
   Disp_Word_U(0, 40, 5, 12345, 0, 0);
-/*-------------------------------------��Ļ��������----------------------------------------------*/
+/*-------------------------------------SSD1305 test program----------------------------------------------*/
   /* USER CODE END 2 */
 
-  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+//  /* Call init function for freertos objects (in cmsis_os2.c) */
+//  MX_FREERTOS_Init();
 
-  /* Start scheduler */
-  osKernelStart();
+//  /* Start scheduler */
+//  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -203,7 +203,28 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    switch (key_scan(0))
+        {
+            case KEY1_PRES:
+            printf("key1\n");
+            break;
+            
+            case KEY2_PRES:
+            printf("key2\n");
+            break;
+            
+            case KEY3_PRES:
+            printf("key3\n");
+            break;
+            
+            case KEY4_PRES:
+            printf("key4\n");
+            break;
 
+            default:
+            break;
+        }
+    delay_ms(20);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -281,22 +302,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-//  if(s_pidFlag % 200 ==0)                                       /* 200ms����һ�β��� */
+//  if(s_pidFlag % 200 ==0)                                      
 //  {
 //      s_pidFlag = 0;
-//    if(tps02r_get_temp(0,&pt100_1) == TPS02R_FUN_OK)            /* ��ȡPT100�������¶�ֵ */
+//    if(tps02r_get_temp(0,&pt100_1) == TPS02R_FUN_OK)          
 //    {
-//       g_stPid1.Pv = combined_filter(&g_stFilter1,pt100_1);     /* ��ȡʵ���¶� */
+//       g_stPidFront.Pv = combined_filter(&g_stFilter1,pt100_1);     
 //       #ifdef Test
-//            RelayFeedbackAutoTuning(&g_stPid1, &g_stPid1Auto);  /* PID������ִֻ��һ�� */
-//       #endif
+//            RelayFeedbackAutoTuning(&g_stPidFront, &g_stPidFrontAuto);
 
 //       #ifdef Run    
-//            RUN(&g_stPid1, &g_stPid1Auto);
+//            RUN(&g_stPidFront, &g_stPidFrontAuto);
 //       #endif
 
-//        PID_Calc(&g_stPid1, &g_stPid1Auto);                     /* PID���� */
-//        TIM4->CCR4 = g_stPid1.OUT-1;        
+//        PID_Calc(&g_stPidFront, &g_stPidFrontAuto);                    
+//        TIM4->CCR4 = g_stPidFront.OUT-1;        
 //    }
 
 //  }

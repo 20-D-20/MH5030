@@ -95,6 +95,11 @@ typedef struct {
     uint32_t timeout_ms;
 } MAX6675_Config_t;
 
+/* 全局变量声明 */
+
+extern MAX6675_Handle_t g_stMax6675;
+
+
 /* 公共函数声明 */
 void    MAX6675_Setup(void);
 void    Temperature_Monitor_Task(void);

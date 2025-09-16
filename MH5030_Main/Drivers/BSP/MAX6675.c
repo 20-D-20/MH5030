@@ -2,11 +2,8 @@
 #include <stdio.h>
 
 /* 全局变量定义 */
-MAX6675_Handle_t max6675;
+MAX6675_Handle_t g_stMax6675;
 float temperatures[MAX6675_CHANNELS];
-
-/* 私有宏定义 */
-#define DELAY_US(x)     HAL_Delay(1)  /* 简单延时，实际应用中应使用更精确的延时 */
 
 /* 私有函数声明 */
 static void MAX6675_GPIO_Init(MAX6675_Handle_t* handle, const MAX6675_Config_t* config);
@@ -36,14 +33,14 @@ void Temperature_Monitor_Task(void)
    for(uint8_t i = 0; i < MAX6675_CHANNELS; i++) 
    {
        /* 检查通道是否准备好 */
-       if(!MAX6675_IsChannelReady(&max6675, i)) 
+       if(!MAX6675_IsChannelReady(&g_stMax6675, i)) 
        {
            printf("CH%d: Not ready\r\n", i + 1);
            continue;
        }
        
        /* 读取带滤波的温度 */
-       result = MAX6675_ReadTemperatureFiltered(&max6675, i, &temp);
+       result = MAX6675_ReadTemperatureFiltered(&g_stMax6675, i, &temp);
        
        /* 根据结果处理 */
        switch(result) {
@@ -86,7 +83,7 @@ void Temperature_Monitor_Task(void)
    /* 每10个周期打印一次统计信息 */
    if(cycle_count % 10 == 0) {
        printf("\r\n");
-       MAX6675_PrintStatus(&max6675);
+       MAX6675_PrintStatus(&g_stMax6675);
    }
 }
 
@@ -127,10 +124,8 @@ void Temperature_Monitor_Task(void)
     config.timeout_ms = 100;
     
     /* 初始化MAX6675 */
-    if(MAX6675_Init(&max6675, &config) != HAL_OK) 
-    {
-        printf("MAX6675 initialization failed!\r\n");
-    }
+    MAX6675_Init(&g_stMax6675, &config);
+
 }
 
 /**
@@ -191,10 +186,7 @@ HAL_StatusTypeDef MAX6675_Init(MAX6675_Handle_t* handle, const MAX6675_Config_t*
     
     /* SCK拉低 */
     MAX6675_SetSCK(handle, GPIO_PIN_RESET);
-    
-    /* 等待传感器稳定 */
-    delay_ms(200);
-    
+     
     return HAL_OK;
 }
 
@@ -393,7 +385,7 @@ static float MAX6675_ApplyFilter(MAX6675_Handle_t* handle, uint8_t channel, floa
     for(uint8_t i = 0; i < MAX6675_FILTER_SIZE; i++) 
     {
         if(ch_status->temp_buffer[i] > 0) 
-         {
+        {
             sum += ch_status->temp_buffer[i];
             count++;
         }
