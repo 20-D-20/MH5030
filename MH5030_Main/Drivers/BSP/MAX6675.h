@@ -49,6 +49,7 @@ typedef struct {
 typedef struct {
     float temperature;                      /* 当前温度 */
     float temp_buffer[MAX6675_FILTER_SIZE]; /* 滤波缓冲区 */
+    float temp_filter;                      /* 滤波后的温度 */
     uint8_t buffer_index;                   /* 缓冲区索引 */
     bool is_initialized;                    /* 初始化标志 */
     bool is_open;                           /* 开路标志 */

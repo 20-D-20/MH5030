@@ -388,10 +388,12 @@ static float MAX6675_ApplyFilter(MAX6675_Handle_t* handle, uint8_t channel, floa
         {
             sum += ch_status->temp_buffer[i];
             count++;
+            new_temp = sum / count;
+            g_stMax6675.channels[0].temp_filter = new_temp;   /* 记录滤波后的温度值 */
         }
     }
     
-    return (count > 0) ? (sum / count) : new_temp;
+    return new_temp;
 }
 
 /**
