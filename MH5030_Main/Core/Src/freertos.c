@@ -40,6 +40,7 @@
 #include "fan_control.h"
 #include "iwdg.h"
 #include "key.h"
+#include "temp_monitor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -177,13 +178,18 @@ void StartDefaultTask(void const * argument)
 void fan_task(void const * argument)
 {
   /* USER CODE BEGIN fan_task */
-    Fan_Init();                   /* ��ʼ�� PWM/EXTI ���ڲ�״̬ */
-    Fan_Start();                  /* �ϵ翪������,Ĭ��ռ�ձ�85% */
+    Fan_Init();                   /* ��ʼ�� PWM/EXTI ���ڲ�״̬ */
+    Fan_Start();                  /* �ϵ翪������,Ĭ��ռ�ձ�85% */
   /* Infinite loop */
   for(;;)
   {
-    Fan_Update();
-    osDelay(1);
+    Fan_Update();				  /* ���·���ת̬ */
+	if(g_stFanStatus.fault_consec >= 10)					/* ��μ�⵽���ȹ��� */
+	{ 	
+  		HAL_GPIO_WritePin(GPIOB, BELL_Pin, GPIO_PIN_SET);	/* ���������� */
+		g_stFanStatus.fault = 1;			                /* �÷��ȹ��ϱ�־λ */
+    } 
+    osDelay(200);
   }
   /* USER CODE END fan_task */
 }
@@ -198,10 +204,31 @@ void fan_task(void const * argument)
 void tcouple_task(void const * argument)
 {
   /* USER CODE BEGIN tcouple_task */
+  MAX6675_Setup();						/* ��ʼ��Max6675 */
+  float temp_max6675;				    /* ��ȡ�¶�ֵ */
+  MAX6675_Error_e result ;              /* ��¼����ֵ */
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	/* ���ͨ���Ƿ�׼���� */
+	if(MAX6675_IsChannelReady(&g_stMax6675, MAX6675_CH1)) 
+	{
+		/* ��ȡ���˲����¶� */
+		result = MAX6675_ReadTemperatureFiltered(&g_stMax6675, MAX6675_CH1, &temp_max6675);
+	}
+	
+	if(result != MAX6675_OK)
+	{
+		if(g_stMax6675.total_errors >= 3)		/* ������ȡ����3�� */
+		{
+			//������
+		}
+	}
+	else 
+	{
+		g_stMax6675.total_errors = 0 ;        	/* һ�ζ�ȡ��ȷ���������ͳ�� */  
+	}
+    osDelay(300);
   }
   /* USER CODE END tcouple_task */
 }
@@ -234,10 +261,14 @@ void ds18b20_task(void const * argument)
 void wdg_task(void const * argument)
 {
   /* USER CODE BEGIN wdg_task */
+	MX_IWDG_Init();					/* ��ʼ�����Ź� */
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+  	/* Ӳ�����Ź� +   ����ָʾ�� */
+    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+  	HAL_IWDG_Refresh(&hiwdg);
+    osDelay(500);
   }
   /* USER CODE END wdg_task */
 }
