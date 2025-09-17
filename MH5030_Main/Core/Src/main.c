@@ -42,6 +42,7 @@
 #include "pid.h"
 #include "fan_control.h"
 #include "key.h"
+#include "temp_monitor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -183,11 +184,12 @@ int main(void)
 
   
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
-  SSD1305_init();                                       
-  clearscreen();                                        
-  Disp_Char(0, 10, 'A', false);                         
-  DispString(0, 20, (unsigned char*)"Hello", false);    
-  Disp_Word_U(0, 40, 5, 12345, 0, 0);
+//  SSD1305_init();                                       
+//  clearscreen();                                        
+//  Disp_Char(0, 10, 'A', false);                         
+//  DispString(0, 0, (unsigned char*)"前枪管", false);    
+// 温度监控系统初始化
+    TempMonitor_Init();
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
   /* USER CODE END 2 */
 
@@ -203,28 +205,8 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    switch (key_scan(0))
-        {
-            case KEY1_PRES:
-            printf("key1\n");
-            break;
-            
-            case KEY2_PRES:
-            printf("key2\n");
-            break;
-            
-            case KEY3_PRES:
-            printf("key3\n");
-            break;
-            
-            case KEY4_PRES:
-            printf("key4\n");
-            break;
-
-            default:
-            break;
-        }
-    delay_ms(20);
+    TempMonitor_Process();
+    HAL_Delay(20);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -300,6 +282,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM2)
   {
     HAL_IncTick();
+    TempMonitor_TimerHandler();
   }
   /* USER CODE BEGIN Callback 1 */
 //  if(s_pidFlag % 200 ==0)                                      
@@ -355,3 +338,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+

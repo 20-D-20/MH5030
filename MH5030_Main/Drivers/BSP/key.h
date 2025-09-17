@@ -11,12 +11,12 @@
 #define KEY4        HAL_GPIO_ReadPin(KEY4_GPIO_Port, KEY4_Pin)     /* 读取KEY4引脚 */
 
 
-#define KEY1_PRES    1              /* KEY1按下 */
-#define KEY2_PRES    2              /* KEY2按下 */
-#define KEY3_PRES    3              /* KEY3按下 */
-#define KEY4_PRES    4              /* KEY4按下 */
+#define KEY_CONFIRM  1               /* KEY1按下 */
+#define KEY_RETURN   2               /* KEY2按下 */
+#define KEY_DOWN     3               /* KEY3按下 */
+#define KEY_UP       4               /* KEY4按下 */
 
-uint8_t key_scan(uint8_t mode);     /* 按键扫描函数 */
+uint8_t key_scan(uint8_t mode);  /* 按键扫描函数 */
 
 #endif
 

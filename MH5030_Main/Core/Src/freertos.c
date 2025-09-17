@@ -177,9 +177,12 @@ void StartDefaultTask(void const * argument)
 void fan_task(void const * argument)
 {
   /* USER CODE BEGIN fan_task */
+    Fan_Init();                   /* 初始化 PWM/EXTI 与内部状态 */
+    Fan_Start();                  /* 上电开启风扇,默认占空比85% */
   /* Infinite loop */
   for(;;)
   {
+    Fan_Update();
     osDelay(1);
   }
   /* USER CODE END fan_task */

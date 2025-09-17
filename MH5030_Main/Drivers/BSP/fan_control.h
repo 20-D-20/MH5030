@@ -21,6 +21,7 @@ typedef struct {
     uint16_t rpm;           // 当前转速
     uint8_t  duty_cycle;    // 占空比
     uint8_t  fault;         // 故障标志
+    uint8_t  fault_consec;  // 错误计数
     uint8_t  enable;        // 使能状态
 } FanStatus_t;
 

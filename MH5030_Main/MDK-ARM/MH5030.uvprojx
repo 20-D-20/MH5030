@@ -313,7 +313,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
+            <Optim>2</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -708,19 +708,9 @@
               <FilePath>..\Drivers\BSP\pid.c</FilePath>
             </File>
             <File>
-              <FileName>pid.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Drivers\BSP\pid.h</FilePath>
-            </File>
-            <File>
               <FileName>fan_control.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\fan_control.c</FilePath>
-            </File>
-            <File>
-              <FileName>fan_control.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Drivers\BSP\fan_control.h</FilePath>
             </File>
             <File>
               <FileName>fan_filter.c</FileName>
@@ -728,19 +718,19 @@
               <FilePath>..\Drivers\BSP\fan_filter.c</FilePath>
             </File>
             <File>
-              <FileName>fan_filter.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Drivers\BSP\fan_filter.h</FilePath>
-            </File>
-            <File>
               <FileName>key.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\BSP\key.c</FilePath>
             </File>
             <File>
-              <FileName>key.h</FileName>
+              <FileName>temp_monitor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\temp_monitor.c</FilePath>
+            </File>
+            <File>
+              <FileName>temp_monitor.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Drivers\BSP\key.h</FilePath>
+              <FilePath>..\Drivers\BSP\temp_monitor.h</FilePath>
             </File>
           </Files>
         </Group>

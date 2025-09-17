@@ -215,7 +215,7 @@ void dispHzChar(u8 x, u8 y, u16 gb_code, bool fb)
 
     if (x >= MAX_COL || y > MAX_ROW)    return;                    /* 越界保护 */
 
-    /* asc_code -= '0';  保留原注释（无效代码，可能用于调试） */     /* 说明性注释 */
+    /* asc_code -= '0';  保留原注释（无效代码，可能用于调试） */                     /* 说明性注释 */
     pcode = GB_16[gb_code].Msk;                                    /* 取字模指针 */
 
     if (fb)   mask = 0xFF;                                         /* 反色：按字节取反（XOR 0xFF） */
@@ -258,7 +258,7 @@ u16 searchIndex(uc8 da[2])
  */
 void DispString(u8 x, u8 y, cchar* str, bool Fb)
 {
-    /* u16 max_cnt = 0;  若需统计已写入的字节数，可启用该变量 */             /* 说明性注释 */
+    /* u16 max_cnt = 0;  若需统计已写入的字节数，可启用该变量 */                             /* 说明性注释 */
     u16 hz_index = 0;                                                      /* 汉字在 GB_16 表中的下标 */
 
     while (*str)
