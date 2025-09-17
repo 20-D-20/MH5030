@@ -1,0 +1,51 @@
+# ===== Keil MDK / uVision =====
+
+# 构建目录（任意层级）
+**/MDK-ARM/Objects/**
+**/MDK-ARM/Listings/**
+**/Objects/**
+**/Listings/**
+
+# 编译/链接产物
+*.axf
+*.elf
+*.hex
+*.bin
+*.o
+*.obj
+*.d
+*.dep
+*.crf
+*.map
+*.lst
+*.lnp
+*.out
+*.bak
+*.plg
+*.htm
+
+# 个人/本机 IDE 配置
+*.sct
+*.uvoptx
+*.uvguix
+*.uvgui
+*.uvguix.*
+*.uvgui.*
+*.uvprojx.bak
+*.uvoptx.bak
+JLinkSettings.ini
+JLink*.log
+STLink*.log
+*.cdb
+*.tracespec
+
+
+# 临时/杂项
+*.~*
+*.tmp
+build/
+.vscode/
+.idea/
+*.user
+.DS_Store
+Thumbs.db
