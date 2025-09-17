@@ -31,6 +31,9 @@ static void Fan_PWM_Init(void);
 static void Fan_Capture_Init(void);
 static uint16_t Fan_CalculateRPM(uint32_t pulse_count, uint32_t period_ms);
 
+/* Public variables ---------------------------------------------------------*/
+FanStatus_t g_stFanStatus = {0};   	 /* 记录风扇的运行状态 */
+
 /* Public functions ----------------------------------------------------------*/
 /**
   * @brief  初始化风扇控制
@@ -225,10 +228,12 @@ void Fan_Update(void)
         if (fan.enable && fan.rpm < FAN_FAULT_THRESHOLD) 
         {
             fan.fault = 1;
+			g_stFanStatus.fault_consec ++;							/* 估计次数统计 */
         } 
         else 
         {
             fan.fault = 0;
+			g_stFanStatus.fault_consec = 0;							/* 正常运行 */
         }       
         // 更新计数
         fan.last_pulse_count = fan.pulse_count;

@@ -30,6 +30,9 @@ typedef struct {
 #define FAN_MAX_RPM         4000    // 最大转速
 #define FAN_DEFAULT_RPM     2000    // 默认转速
 
+/* Exported variables --------------------------------------------------------*/
+extern FanStatus_t g_stFanStatus;
+
 /* Exported functions prototypes ---------------------------------------------*/
 // 初始化函数
 void Fan_Init(void);
