@@ -56,7 +56,7 @@ bool Ds18b20_ManualConvert(Ds18b20Sensor_t *ds18b20, OneWire_t *OneWire)
     ds18b20->DataIsValid = ok;                                           /* 标记有效性 */
     if (ok)
     {
-        ds18b20->Temperature = t ;                                        /* 仅成功时更新 */
+        ds18b20->Temperature = t ;                                       /* 仅成功时更新 */
     }
     return ok;
 }

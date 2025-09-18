@@ -159,7 +159,7 @@ int main(void)
 
 /*-------------------------------------TPS02R test program----------------------------------------------*/
 //  u8 error = 0;                                                             
-//  tps02r_iic_init(&tps02r_iicmanger);                                        
+//  tps02r_iic_init(&g_stTps02r_IICManger);                                        
 //  error=tps02r_cfg_init();
 //  if(error==0)
 //  {
@@ -184,12 +184,20 @@ int main(void)
 
   
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
-//  SSD1305_init();                                       
-//  clearscreen();                                        
+  SSD1305_init();                                       
+  clearscreen();
+
+// /* 起始界面 */
+//  DispString(40, 16, (unsigned char*)"MH5030",   false);
+//  DispString(28, 40, (unsigned char*)"Ver 1.0.0", false);
+
+    /*  */
+    DispString(0, 0, (unsigned char*)"温度",   false);
+//  draw_rect(10, 8, 50, 30, false);
+//  draw_hline(0,23,32,false);
+//  Show_Word_U(0, 0, 12311, 5, 2, false);   // 显示为 123.11
 //  Disp_Char(0, 10, 'A', false);                         
 //  DispString(0, 0, (unsigned char*)"前枪管", false);    
-// 温度监控系统初始化
-    TempMonitor_Init();
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
   /* USER CODE END 2 */
 
@@ -203,10 +211,16 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t num = 0;
   while (1)
   {
-    TempMonitor_Process();
-    HAL_Delay(20);
+//    num++;
+//    if(num >1000)
+//    {
+//        num = 0;
+//    }
+//    Show_Word_U(0, 0, num, 5, 0, true);   
+//    delay_ms(200);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -276,33 +290,13 @@ void SystemClock_Config(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
-//  static u8 s_pidFlag = 0;
-//  float pt100_1 = 0;
+    
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM2)
   {
     HAL_IncTick();
-    TempMonitor_TimerHandler();
   }
-  /* USER CODE BEGIN Callback 1 */
-//  if(s_pidFlag % 200 ==0)                                      
-//  {
-//      s_pidFlag = 0;
-//    if(tps02r_get_temp(0,&pt100_1) == TPS02R_FUN_OK)          
-//    {
-//       g_stPidFront.Pv = combined_filter(&g_stFilter1,pt100_1);     
-//       #ifdef Test
-//            RelayFeedbackAutoTuning(&g_stPidFront, &g_stPidFrontAuto);
 
-//       #ifdef Run    
-//            RUN(&g_stPidFront, &g_stPidFrontAuto);
-//       #endif
-
-//        PID_Calc(&g_stPidFront, &g_stPidFrontAuto);                    
-//        TIM4->CCR4 = g_stPidFront.OUT-1;        
-//    }
-
-//  }
   /* USER CODE END Callback 1 */
 }
 

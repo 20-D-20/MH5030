@@ -73,7 +73,7 @@ osThreadId Wdg_TaskHandle;
 
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void const * argument);
+void heaterctrl_task(void const * argument);
 void fan_task(void const * argument);
 void tcouple_task(void const * argument);
 void ds18b20_task(void const * argument);
@@ -125,7 +125,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of HeaterCtrl_Task */
-  osThreadDef(HeaterCtrl_Task, StartDefaultTask, osPriorityAboveNormal, 0, 128);
+  osThreadDef(HeaterCtrl_Task, heaterctrl_task, osPriorityAboveNormal, 0, 128);
   HeaterCtrl_TaskHandle = osThreadCreate(osThread(HeaterCtrl_Task), NULL);
 
   /* definition and creation of Fan_Task */
@@ -157,13 +157,49 @@ void MX_FREERTOS_Init(void) {
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+void heaterctrl_task(void const * argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
+    tps02r_iic_init(&g_stTps02r_IICManger);                                     /* Initialize tps02r */
+    pid_front_init(&g_stPidFront,&g_stPidFrontAuto,&g_stFilterFront);           /* Initialize front PID controller */
+    pid_rear_init(&g_stPidRear,&g_stPidRearAuto, &g_stFilterRear);              /* Initialize rear PID controller */
+    float pt100_front = 0;                                                      /* Record front temperature */
+    float pt100_rear = 0;                                                       /* Record rear temperature */
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+          
+     if(tps02r_get_temp(TPS02R_CHAN2,&pt100_front) == TPS02R_FUN_OK)          
+     {
+           g_stPidFront.Pv = combined_filter(&g_stFilterFront,pt100_front);     
+           #ifdef Test
+                RelayFeedbackAutoTuning(&g_stPidFront, &g_stPidFrontAuto);
+           #endif
+         
+           #ifdef Run    
+                RUN(&g_stPidFront, &g_stPidFrontAuto);
+           #endif
+    
+            PID_Calc(&g_stPidFront, &g_stPidFrontAuto);                    
+            TIM4->CCR4 = g_stPidFront.OUT - 1;        
+     }
+     
+     if(tps02r_get_temp(TPS02R_CHAN1,&pt100_rear) == TPS02R_FUN_OK)          
+     {
+           g_stPidRear.Pv = combined_filter(&g_stFilterFront,pt100_rear);     
+           #ifdef Test
+                RelayFeedbackAutoTuning(&g_stPidRear, &g_stPidRearAuto);
+           #endif
+         
+           #ifdef Run    
+                RUN(&g_stPidRear, &g_stPidRearAuto);
+           #endif
+    
+            PID_Calc(&g_stPidRear, &g_stPidRearAuto);                    
+            TIM1->CCR2 = g_stPidRear.OUT - 1;        
+     }
+
+    osDelay(200);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -178,19 +214,19 @@ void StartDefaultTask(void const * argument)
 void fan_task(void const * argument)
 {
   /* USER CODE BEGIN fan_task */
-    Fan_Init();                   /* ��ʼ�� PWM/EXTI ���ڲ�״̬ */
-    Fan_Start();                  /* �ϵ翪������,Ĭ��ռ�ձ�85% */
+    Fan_Init();                                                  /* Fan initialization */
+    Fan_Start();                                                 /* Start fan, default duty cycle 85% */
   /* Infinite loop */
-  for(;;)
-  {
-    Fan_Update();				  /* ���·���ת̬ */
-	if(g_stFanStatus.fault_consec >= 10)					/* ��μ�⵽���ȹ��� */
-	{ 	
-  		HAL_GPIO_WritePin(GPIOB, BELL_Pin, GPIO_PIN_SET);	/* ���������� */
-		g_stFanStatus.fault = 1;			                /* �÷��ȹ��ϱ�־λ */
-    } 
-    osDelay(200);
-  }
+    for(;;)
+    {
+        Fan_Update();                                            /* Update fan status */
+        if(g_stFanStatus.fault_consec >= 10)                     /* Continuous fault count >= 10? */
+        { 
+            HAL_GPIO_WritePin(GPIOB, BELL_Pin, GPIO_PIN_SET);    /* Trigger alarm */
+            g_stFanStatus.fault = 1;                             /* Set fault flag */
+        } 
+        osDelay(200);
+    }
   /* USER CODE END fan_task */
 }
 
@@ -204,30 +240,30 @@ void fan_task(void const * argument)
 void tcouple_task(void const * argument)
 {
   /* USER CODE BEGIN tcouple_task */
-  MAX6675_Setup();						/* ��ʼ��Max6675 */
-  float temp_max6675;				    /* ��ȡ�¶�ֵ */
-  MAX6675_Error_e result ;              /* ��¼����ֵ */
-  /* Infinite loop */
+  MAX6675_Setup();                                               /* Initialize Max6675 */
+  float temp_max6675;                                            /* Record temperature value */
+  MAX6675_Error_e result ;                                       /* Record read status */
+  /* Infinite loop */                  
   for(;;)
   {
-	/* ���ͨ���Ƿ�׼���� */
-	if(MAX6675_IsChannelReady(&g_stMax6675, MAX6675_CH1)) 
-	{
-		/* ��ȡ���˲����¶� */
-		result = MAX6675_ReadTemperatureFiltered(&g_stMax6675, MAX6675_CH1, &temp_max6675);
-	}
-	
-	if(result != MAX6675_OK)
-	{
-		if(g_stMax6675.total_errors >= 3)		/* ������ȡ����3�� */
-		{
-			//������
-		}
-	}
-	else 
-	{
-		g_stMax6675.total_errors = 0 ;        	/* һ�ζ�ȡ��ȷ���������ͳ�� */  
-	}
+     /* Check if thermocouple channel is ready */
+    if(MAX6675_IsChannelReady(&g_stMax6675, MAX6675_CH1)) 
+    {
+         /* Read thermocouple temperature */
+        result = MAX6675_ReadTemperatureFiltered(&g_stMax6675, MAX6675_CH1, &temp_max6675);
+    }
+    
+    if(result != MAX6675_OK)
+    {
+        if(g_stMax6675.total_errors >= 3)                        /* Continuous read errors >= 3 */
+        {
+            //Error handling
+        }
+    }
+    else 
+    {
+        g_stMax6675.total_errors = 0 ;                           /* Reset error count */
+    }
     osDelay(300);
   }
   /* USER CODE END tcouple_task */
@@ -243,10 +279,25 @@ void tcouple_task(void const * argument)
 void ds18b20_task(void const * argument)
 {
   /* USER CODE BEGIN ds18b20_task */
+  OneWire_Init(&g_stOneWire_1,DS18B20_1_GPIO_Port, DS18B20_1_Pin); 
+  bool ok = true;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    ok = Ds18b20_ManualConvert(&g_stDs18b20_1,&g_stOneWire_1);
+    if(ok != true)
+    {
+        if(g_stDs18b20_1.error_count >= 3)
+        {
+            //Error handling
+        }
+    }
+    else 
+    {
+        g_stDs18b20_1.error_count = 0;                 /* Reset error count */
+        g_stDs18b20_1.DataIsValid = true;              /* Data valid */
+    }
+    osDelay(200);
   }
   /* USER CODE END ds18b20_task */
 }
@@ -261,11 +312,11 @@ void ds18b20_task(void const * argument)
 void wdg_task(void const * argument)
 {
   /* USER CODE BEGIN wdg_task */
-	MX_IWDG_Init();					/* ��ʼ�����Ź� */
+    MX_IWDG_Init();                                    /* Initialize watchdog */
   /* Infinite loop */
   for(;;)
   {
-  	/* Ӳ�����Ź� +   ����ָʾ�� */
+                                                       /* Hardware watchdog + LED indicator */
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
   	HAL_IWDG_Refresh(&hiwdg);
     osDelay(500);
@@ -277,4 +328,5 @@ void wdg_task(void const * argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
+
 

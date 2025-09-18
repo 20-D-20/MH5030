@@ -3,10 +3,10 @@
 /* PID自整定相关结构体变量 */
 PidType g_stPidFront = {0};                   /* 前枪管PID控制器结构体 */
 TuneObjectType g_stPidFrontAuto = {0};        /* 前枪管PID自整定对象结构体 */
-FilterCtx g_stFilter1 = {0};                  /* 前枪管滤波器结构体 */
+FilterCtx g_stFilterFront = {0};              /* 前枪管滤波器结构体 */
 PidType g_stPidRear = {0};                    /* 腔体PID控制器结构体 */
 TuneObjectType g_stPidRearAuto = {0};         /* 腔体PID自整定对象结构体 */
-FilterCtx g_stFilter2 = {0};                  /* 腔体滤波器结构体 */
+FilterCtx g_stFilterRear = {0};               /* 腔体滤波器结构体 */
 
 /* 测试/调试 变量 */
 unsigned int full_flag = 0;                   /* 满标志 */
@@ -20,7 +20,7 @@ unsigned int num_test = 0;                    /* 测试变量1 */
  * @note      可选择Test(自整定)或Run(普通PID)两种工作模式
  * @retval    void
  */
-void pid1_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter)
+void pid_front_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter)
 {
     vPID->Sv = 120;                            /* 设定值 */
     vPID->T  = 200;                            /* 采样周期/积分周期 */
@@ -44,7 +44,10 @@ void pid1_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter)
              
 #endif
 
-   TunePretreatment(vPID,tune);                /* 自整定对象结构体参数配置 */
+   /* 预处理使能、自整定使能均为一，PID自整定模式才可使用 */
+    tune->preEnable        = 1;                /* 预处理使能置一 */
+    tune->tuneEnable       = 1;                /* 自整定使能置一 */ 
+                                               
    filter_init(filter, /*N=*/10, /*MEDIAN_N=*/5, /*limit_step=*/0.5f);    /* 滤波器参数配置 */
     
 }
@@ -57,7 +60,7 @@ void pid1_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter)
  * @note      可选择Test(自整定)或Run(普通PID)两种工作模式
  * @retval    void
  */
-void pid2_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter)
+void pid_rear_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter)
 {
     vPID->Sv = 120;                            /* 设定值 */
     vPID->T  = 200;                            /* 采样周期/积分周期 */
@@ -81,7 +84,9 @@ void pid2_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter)
              
 #endif
 
-   TunePretreatment(vPID,tune);                /* 自整定对象结构体参数配置 */
+    /* 预处理使能、自整定使能均为一，PID自整定模式才可使用 */
+   tune->preEnable        = 1;                /* 预处理使能置一 */
+   tune->tuneEnable       = 1;                /* 自整定使能置一 */ 
    filter_init(filter, /*N=*/10, /*MEDIAN_N=*/5, /*limit_step=*/0.5f);    /* 滤波器参数配置 */
     
 }
@@ -95,11 +100,6 @@ void pid2_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter)
  */
 static void TunePretreatment(PidType *vPID, TuneObjectType *tune)
 {
-    /* 预处理使能、自整定使能均为一，PID自整定模式才可使用 */
-    
-    tune->preEnable        = 1;                /* 预处理使能置一 */
-    tune->tuneEnable       = 1;                /* 自整定使能置一 */ 
-                                               
     tune->maxPV            = 0;                /* 最大过程量清零 */
     tune->minPV            = 0;                /* 最小过程量清零 */
     tune->tuneTimer        = 0;                /* 自整定计时器 */
@@ -119,7 +119,7 @@ static void TunePretreatment(PidType *vPID, TuneObjectType *tune)
         tune->initialStatus  = 0;              
         tune->outputStatus   = 1;              
     }                                          
-                                               
+    tune->preEnable         = 0;               /* 预处理使能清零 */                                           
     tune->zeroAcrossCounter = 0;               /* 零点穿越计数清零 */
     tune->riseLagCounter    = 0;               /* 上升滞后计数清零 */
     tune->fallLagCounter    = 0;               /* 下降滞后计数清零 */

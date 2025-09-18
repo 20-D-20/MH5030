@@ -1,6 +1,6 @@
 #include "tps02r.h"
 // 定义全局IIC管理结构体和初始化配置结构体
-IICManager_ST               tps02r_iicmanger;
+IICManager_ST               g_stTps02r_IICManger;
 
 void tps02r_iic_init(IICManager_ST *pstIIC)
 {
@@ -75,11 +75,11 @@ int tps02r_get_temp(int8_t chan, float *p_data)
     }
     
     /* 调用读取数据函数，返回值判断读取是否成功 */
-    iic_start(&tps02r_iicmanger.stPara);                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_TEMP_ADDR);          /* 发送命令 */
-    iic_start(&tps02r_iicmanger.stPara);                                        /* 起始 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_R);          /* 设备写地址 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_TEMP_ADDR);          /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                        /* 起始 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_R);          /* 设备写地址 */
 
     if (error != 0)                                                             /* 返回值判断读取是否成功 */
     {
@@ -90,12 +90,12 @@ int tps02r_get_temp(int8_t chan, float *p_data)
     {
         if(i < TPS02R_TEMP_LEN - 1)
         {
-            rx_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 1);            /* 读高字节，主机发ACK */
+            rx_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 1);            /* 读高字节，主机发ACK */
         }
         else
         {
-            rx_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 0);            /* 读取结束主机发NACK */
-            iic_stop(&tps02r_iicmanger.stPara);                                 /* 停止信号 */
+            rx_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 0);            /* 读取结束主机发NACK */
+            iic_stop(&g_stTps02r_IICManger.stPara);                                 /* 停止信号 */
         }
     }
     
@@ -134,11 +134,11 @@ int tps02r_set_high(int8_t chan, float temp)
     temp1 = (int64_t)((temp) * (0x1 << 13));                                    /* 将温度转换为编码格式 */
 
     /* 读取当前的温度设置 */
-    iic_start(&tps02r_iicmanger.stPara);                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_THIG_ADDR);          /* 发送命令 */
-    iic_start(&tps02r_iicmanger.stPara);                                        /* 起始 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_R);          /* 设备写地址 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_THIG_ADDR);          /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                        /* 起始 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_R);          /* 设备写地址 */
 
     if (error != 0)                                                             /* 返回值判断读取是否成功 */
     {
@@ -149,12 +149,12 @@ int tps02r_set_high(int8_t chan, float temp)
     {
         if(i < TPS02R_THIG_LEN - 1)
         {
-            temp_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 1);          /* 读高字节，主机发ACK */
+            temp_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 1);          /* 读高字节，主机发ACK */
         }
         else
         {
-            temp_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 0);          /* 读取结束主机发NACK */
-            iic_stop(&tps02r_iicmanger.stPara);                                 /* 停止信号 */
+            temp_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 0);          /* 读取结束主机发NACK */
+            iic_stop(&g_stTps02r_IICManger.stPara);                                 /* 停止信号 */
         }
     }
 
@@ -188,9 +188,9 @@ int tps02r_set_high(int8_t chan, float temp)
     }
 
     /* 将设置的上限温度值写入设备 */
-    iic_start(&tps02r_iicmanger.stPara);                                         /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);           /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_THIG_ADDR);           /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                         /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);           /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_THIG_ADDR);           /* 发送命令 */
 
     if (error != 0)                                                              /* 返回值判断读取是否成功 */
     {
@@ -201,12 +201,12 @@ int tps02r_set_high(int8_t chan, float temp)
     {
         if(i < TPS02R_THIG_LEN - 1)
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, temp_buff[i]);               /* 将设置的上限温度值写入寄存器  */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, temp_buff[i]);               /* 将设置的上限温度值写入寄存器  */
         }
         else
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, temp_buff[i]);               
-            iic_stop(&tps02r_iicmanger.stPara);                                  /* 停止信号 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, temp_buff[i]);               
+            iic_stop(&g_stTps02r_IICManger.stPara);                                  /* 停止信号 */
         }
     }
 
@@ -235,11 +235,11 @@ int tps02r_set_low(int8_t chan, float temp)
     temp1 = (int64_t)((temp) * (0x1 << 13));                                    /* 将温度转换为编码格式 */
         
     /* 读取当前的温度设置 */ 
-    iic_start(&tps02r_iicmanger.stPara);                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_TLOW_ADDR);          /* 发送命令 */
-    iic_start(&tps02r_iicmanger.stPara);                                        /* 起始 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_R);          /* 设备写地址 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_TLOW_ADDR);          /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                        /* 起始 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_R);          /* 设备写地址 */
     
     if (error != 0)                                                             /* 返回值判断读取是否成功 */
     {   
@@ -250,12 +250,12 @@ int tps02r_set_low(int8_t chan, float temp)
     {   
         if(i < TPS02R_TLOW_LEN - 1) 
         {   
-            temp_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 1);          /* 读高字节，主机发ACK */
+            temp_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 1);          /* 读高字节，主机发ACK */
         }   
         else    
         {   
-            temp_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 0);          /* 读取结束主机发NACK */
-            iic_stop(&tps02r_iicmanger.stPara);                                 /* 停止信号 */
+            temp_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 0);          /* 读取结束主机发NACK */
+            iic_stop(&g_stTps02r_IICManger.stPara);                                 /* 停止信号 */
         }   
     }   
     
@@ -289,9 +289,9 @@ int tps02r_set_low(int8_t chan, float temp)
     }
 
     /* 将设置的下限温度值写入设备 */
-    iic_start(&tps02r_iicmanger.stPara);                                         /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);           /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_TLOW_ADDR);           /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                         /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);           /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_TLOW_ADDR);           /* 发送命令 */
 
     if (error != 0)                                                              /* 返回值判断读取是否成功 */
     {
@@ -302,12 +302,12 @@ int tps02r_set_low(int8_t chan, float temp)
     {
         if(i < TPS02R_TLOW_LEN - 1)
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, temp_buff[i]);               /* 将设置的下限温度值写入寄存器  */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, temp_buff[i]);               /* 将设置的下限温度值写入寄存器  */
         }
         else
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, temp_buff[i]);               
-            iic_stop(&tps02r_iicmanger.stPara);                                  /* 停止信号 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, temp_buff[i]);               
+            iic_stop(&g_stTps02r_IICManger.stPara);                                  /* 停止信号 */
         }
     }
 
@@ -327,11 +327,11 @@ int tps02r_set_chan_sampling_rate(int8_t chan_en, uint32_t rate)
     uint8_t cfg_buff[2] = {0};                                                                  /* 临时配置缓存 */
     int error = 0;
     /* 读取当前的配置寄存器的设置 */
-    iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
-    iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_R);                          /* 设备写地址 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_R);                          /* 设备写地址 */
 
     if (error != 0)                                                                             /* 返回值判断读取是否成功 */
     {
@@ -342,12 +342,12 @@ int tps02r_set_chan_sampling_rate(int8_t chan_en, uint32_t rate)
     {
         if(i < TPS02R_CFG_LEN - 1)
         {
-            cfg_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 1);                           /* 读高字节，主机发ACK */
+            cfg_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 1);                           /* 读高字节，主机发ACK */
         }
         else
         {
-            cfg_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 0);                           /* 读取结束主机发NACK */
-            iic_stop(&tps02r_iicmanger.stPara);                                                 /* 停止信号 */
+            cfg_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 0);                           /* 读取结束主机发NACK */
+            iic_stop(&g_stTps02r_IICManger.stPara);                                                 /* 停止信号 */
         }
     }
 
@@ -363,9 +363,9 @@ int tps02r_set_chan_sampling_rate(int8_t chan_en, uint32_t rate)
     }
 
      /* 将设置的采样率写入设备 */
-    iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
 
     if (error != 0)                                                                             /* 返回值判断读取是否成功 */
     {
@@ -376,12 +376,12 @@ int tps02r_set_chan_sampling_rate(int8_t chan_en, uint32_t rate)
     {
         if(i < TPS02R_CFG_LEN - 1)
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, cfg_buff[i]);                               /* 将设置的采样率写入寄存器 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, cfg_buff[i]);                               /* 将设置的采样率写入寄存器 */
         }
         else
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, cfg_buff[i]);               
-            iic_stop(&tps02r_iicmanger.stPara);                                                 /* 停止信号 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, cfg_buff[i]);               
+            iic_stop(&g_stTps02r_IICManger.stPara);                                                 /* 停止信号 */
         }
     }
     
@@ -412,25 +412,25 @@ int tps02r_cfg_init(void)
 
 
     /* 将设置的上限温度值写入设备 */
-    iic_start(&tps02r_iicmanger.stPara);                                                       /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                         /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_THIG_ADDR);                         /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                       /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                         /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_THIG_ADDR);                         /* 发送命令 */
 
-    if (error != 0)                                                                            /* 返回值判断读取是否成功 */
+    if (error != 0)                                                                                /* 返回值判断读取是否成功 */
     {
-        return TPS02R_FUN_ERROR;                                                               /* 数据读取失败，返回错误码 */
+        return TPS02R_FUN_ERROR;                                                                   /* 数据读取失败，返回错误码 */
     }
 
-    for(int i=0; i < TPS02R_THIG_LEN;i++)                                                      /* 发送給温度寄存器数据，共6个字节 */
+    for(int i=0; i < TPS02R_THIG_LEN;i++)                                                          /* 发送給温度寄存器数据，共6个字节 */
     {
         if(i < TPS02R_THIG_LEN - 1)
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, temph_buff[i]);                            /* 将设置的上限限温度值写入寄存器  */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, temph_buff[i]);                            /* 将设置的上限限温度值写入寄存器  */
         }
         else
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, temph_buff[i]);               
-            iic_stop(&tps02r_iicmanger.stPara);                                                /* 停止信号 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, temph_buff[i]);               
+            iic_stop(&g_stTps02r_IICManger.stPara);                                                /* 停止信号 */
         }
     }
 
@@ -444,50 +444,50 @@ int tps02r_cfg_init(void)
     templ_buff[5] = 0xff;
 
     /* 将设置的下限温度值写入设备 */
-    iic_start(&tps02r_iicmanger.stPara);                                                       /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                         /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_TLOW_ADDR);                         /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_TLOW_ADDR);                          /* 发送命令 */
 
-    if (error != 0)                                                                            /* 返回值判断读取是否成功 */
+    if (error != 0)                                                                                 /* 返回值判断读取是否成功 */
     {
-        return TPS02R_FUN_ERROR;                                                               /* 数据读取失败，返回错误码 */
+        return TPS02R_FUN_ERROR;                                                                    /* 数据读取失败，返回错误码 */
     }
 
-    for(int i=0; i < TPS02R_TLOW_LEN;i++)                                                      /* 发送温度寄存器数据，共6个字节 */
+    for(int i=0; i < TPS02R_TLOW_LEN;i++)                                                           /* 发送温度寄存器数据，共6个字节 */
     {
         if(i < TPS02R_TLOW_LEN - 1)
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, templ_buff[i]);                             /* 将设置的下限温度值写入寄存器  */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, templ_buff[i]);                             /* 将设置的下限温度值写入寄存器  */
         }
         else
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, templ_buff[i]);               
-            iic_stop(&tps02r_iicmanger.stPara);                                                 /* 停止信号 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, templ_buff[i]);               
+            iic_stop(&g_stTps02r_IICManger.stPara);                                                 /* 停止信号 */
         }
     }
 
     /* 读取当前的配置寄存器的设置 */
-    iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
-    iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_R);                          /* 设备写地址 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_R);                          /* 设备写地址 */
 
-    if (error != 0)                                                                             /* 返回值判断读取是否成功 */
+    if (error != 0)                                                                                 /* 返回值判断读取是否成功 */
     {
-        return TPS02R_FUN_ERROR;                                                                /* 数据读取失败，返回错误码 */
+        return TPS02R_FUN_ERROR;                                                                    /* 数据读取失败，返回错误码 */
     }
 
-    for(int i=0; i < TPS02R_CFG_LEN;i++)                                                        /* 读取配置寄存器数据，共2个字节 */
+    for(int i=0; i < TPS02R_CFG_LEN;i++)                                                            /* 读取配置寄存器数据，共2个字节 */
     {
         if(i < TPS02R_CFG_LEN - 1)
         {
-            cfg_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 1);                           /* 读高字节，主机发ACK */
+            cfg_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 1);                           /* 读高字节，主机发ACK */
         }
         else
         {
-            cfg_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 0);                           /* 读取结束主机发NACK */
-            iic_stop(&tps02r_iicmanger.stPara);                                                 /* 停止信号 */
+            cfg_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 0);                           /* 读取结束主机发NACK */
+            iic_stop(&g_stTps02r_IICManger.stPara);                                                 /* 停止信号 */
         }
     }
 
@@ -505,29 +505,29 @@ int tps02r_cfg_init(void)
     cfg_buff[1] |= (0x01 << TPS02R_CFG_EN_SHIFT);
 
     /* 将配置写入设备 */
-    iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */    
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
-    error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
+    iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */    
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
+    error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
 
-    if (error != 0)                                                                             /* 返回值判断读取是否成功 */
+    if (error != 0)                                                                                 /* 返回值判断读取是否成功 */
     {
-        return TPS02R_FUN_ERROR;                                                                /* 数据读取失败，返回错误码 */
+        return TPS02R_FUN_ERROR;                                                                    /* 数据读取失败，返回错误码 */
     }
 
-    for(int i=0; i < TPS02R_CFG_LEN;i++)                                                        /* 发送配置，共2个字节 */
+    for(int i=0; i < TPS02R_CFG_LEN;i++)                                                            /* 发送配置，共2个字节 */
     {
         if(i < TPS02R_CFG_LEN - 1)
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, cfg_buff[i]);                               /* 将配置参数写入寄存器 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, cfg_buff[i]);                               /* 将配置参数写入寄存器 */
         }
         else
         {
-            iic_send_byte(&tps02r_iicmanger.stPara, cfg_buff[i]);               
-            iic_stop(&tps02r_iicmanger.stPara);                                                 /* 停止信号 */
+            iic_send_byte(&g_stTps02r_IICManger.stPara, cfg_buff[i]);               
+            iic_stop(&g_stTps02r_IICManger.stPara);                                                 /* 停止信号 */
         }
     }
 
-    return TPS02R_FUN_OK;                                                                       /* 初始化成功 */
+    return TPS02R_FUN_OK;                                                                           /* 初始化成功 */
 }
 
 
@@ -552,27 +552,27 @@ int tps02r_get_cfg_value(int8_t chan, uint8_t *p_data)
     uint8_t cfg_buff[2] = {0};
 
     /* 读取配置寄存器 */
-   iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */    
-   error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
-   error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
-   iic_start(&tps02r_iicmanger.stPara);                                                        /* 起始 */
-   error |= iic_send_byte(&tps02r_iicmanger.stPara,TPS02R_I2C_ADR_R);                          /* 设备写地址 */
+   iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */    
+   error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_W);                          /* 设备写地址 */
+   error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_CFG_ADDR);                           /* 发送命令 */
+   iic_start(&g_stTps02r_IICManger.stPara);                                                        /* 起始 */
+   error |= iic_send_byte(&g_stTps02r_IICManger.stPara,TPS02R_I2C_ADR_R);                          /* 设备写地址 */
 
-   if (error != 0)                                                                             /* 返回值判断读取是否成功 */
+   if (error != 0)                                                                                 /* 返回值判断读取是否成功 */
    {
-       return TPS02R_FUN_ERROR;                                                                /* 数据读取失败，返回错误码 */
+       return TPS02R_FUN_ERROR;                                                                    /* 数据读取失败，返回错误码 */
    }
 
-   for(int i=0; i < TPS02R_CFG_LEN;i++)                                                        /* 读取配置寄存器数据，共2个字节 */
+   for(int i=0; i < TPS02R_CFG_LEN;i++)                                                            /* 读取配置寄存器数据，共2个字节 */
    {
        if(i < TPS02R_CFG_LEN - 1)
        {
-           cfg_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 1);                           /* 读高字节，主机发ACK */
+           cfg_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 1);                           /* 读高字节，主机发ACK */
        }
        else
        {
-           cfg_buff[i] = iic_read_byte(&tps02r_iicmanger.stPara, 0);                           /* 读取结束主机发NACK */
-           iic_stop(&tps02r_iicmanger.stPara);                                                 /* 停止信号 */
+           cfg_buff[i] = iic_read_byte(&g_stTps02r_IICManger.stPara, 0);                           /* 读取结束主机发NACK */
+           iic_stop(&g_stTps02r_IICManger.stPara);                                                 /* 停止信号 */
        }
    }
 

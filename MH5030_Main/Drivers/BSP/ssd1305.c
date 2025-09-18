@@ -22,7 +22,7 @@ void spi_write(u8 data)
 
         data <<= 1;                                                  /* 左移 1 位，准备下一位 */
 
-       delay_us(1);                                                     /* 短延时，确保数据稳定 */
+       delay_us(1);                                                  /* 短延时，确保数据稳定 */
         CLK_1305_SET;                                                /* 上升沿锁存数据位 */
     }
 }
@@ -117,7 +117,7 @@ void clearscreen(void)
         for (j = 0; j < MAX_COL; j++)                              /* 遍历该页所有列 */
             Write_Data(0x00);                                      /* 写 0 清空像素 */
     }
-    delay_ms(500);                                                    /* 适当延时，等待硬件稳定（单位依平台实现而定） */
+    delay_ms(10);                                                 /* 适当延时，等待硬件稳定（单位依平台实现而定） */
 }
 
 /*
@@ -803,6 +803,162 @@ void set_Sign(u8 x, u8 num)
             Write_Data(0x00);
     }
 }
+
+/**
+ * @brief      在指定页和列写入1字节数据
+ * @param[in]  page: 页地址
+ * @param[in]  col:  列地址  
+ * @param[in]  mask: 数据掩码（bit=1点亮对应像素）
+ * @retval     None
+ * @note       覆盖写模式（非叠加）
+ */
+static inline void write_col_byte(u8 page, u8 col, u8 mask)
+{
+    Set_Addr(page, col);
+    Write_Data(mask);
+}
+
+/**
+ * @brief      在第 y 行像素处从 x0 到 x1 画一条 1 像素厚的水平线
+ * @param      x0   起始列（包含）
+ * @param      x1   结束列（包含）
+ * @param      y    行号（像素坐标）
+ * @param      Fb   颜色/反色标志；false=正常掩码，true=反色掩码
+ * @retval     无
+ *
+ * 说明：
+ * - 显存按页（8 像素高）组织：先计算页号与页内位号，然后构造单行位掩码写入每列。
+ * - 若面板位序相反，可将掩码由 (1u << bit) 改为 (0x80u >> bit)。
+ * - 为避免无效访问，函数会对 x0/x1 做交换并裁剪至显示边界。
+ */
+void draw_hline(u8 x0, u8 x1, u8 y)
+{
+    if (x0 > x1) { u8 t = x0; x0 = x1; x1 = t; }                               /* 保证 x0 <= x1 */
+    if (y >= MAX_ROW) return;                                                  /* 行越界直接返回 */
+    if (x0 >= MAX_COL) return;                                                 /* 起点越界直接返回 */
+    if (x1 >= MAX_COL) x1 = (u8)(MAX_COL - 1);                                 /* 裁剪尾端列 */
+
+    u8 page = (u8)(y >> 3);                                                    /* 所在页 */
+    u8 bit  = (u8)(y & 0x07);                                                  /* 页内第几位（0~7） */
+    u8 mask = (u8)(1u << bit);                                                 /* 若位序相反改为 (0x80u >> bit) */
+    
+    Set_Addr(page, x0);                                                        /* 设定起始写地址 */
+    for (u8 x = x0; x <= x1; x++)                                              /* 逐列写入 */
+    {
+        Write_Data(mask);                                                      /* 写单行位掩码 */
+    }
+}
+
+/**
+ * @brief      在指定列绘制竖向像素段
+ * @param[in]  x:  列坐标
+ * @param[in]  y0: 起始行坐标
+ * @param[in]  y1: 结束行坐标
+ * @retval     None
+ * @note       自动处理跨页拆分，y0/y1可任意顺序
+ */
+void draw_vspan(u8 x, u8 y0, u8 y1)
+{
+    /* 确保 y0 <= y1 */                                                             /* 交换坐标确保顺序 */
+    if (y0 > y1)
+    {
+        u8 t = y0;
+        y0 = y1;
+        y1 = t;
+    }
+    
+    /* 边界检查 */                                                                  /* 超出屏幕范围则返回 */
+    if (x >= MAX_COL || y0 >= MAX_ROW)
+    {
+        return;
+    }
+    
+    /* 裁剪y1到屏幕范围内 */                                                         /* 防止越界 */
+    if (y1 >= MAX_ROW)
+    {
+        y1 = MAX_ROW - 1;
+    }
+
+    /* 计算页地址和位偏移 */                                                         /* 每页8行 */
+    u8 p0 = y0 >> 3;
+    u8 p1 = y1 >> 3;
+    u8 b0 = y0 & 7;
+    u8 b1 = y1 & 7;
+
+    if (p0 == p1)
+    {
+        /* 同页处理：生成位掩码 */                                                   /* 设置b0到b1之间的位 */
+        u8 mask = (u8)((0xFFu << b0) & (0xFFu >> (7 - b1)));
+        write_col_byte(p0, x, mask);
+    }
+    else
+    {
+        /* 首页处理：从b0到页底 */                                                   /* 设置起始位到页末 */
+        u8 first_mask = (u8)(0xFFu << b0);
+        write_col_byte(p0, x, first_mask);
+
+        /* 中间整页处理：全填充 */                                                   /* 完整页全部点亮 */
+        for (u8 p = p0 + 1; p < p1; ++p)
+        {
+            write_col_byte(p, x, 0xFF);
+        }
+
+        /* 末页处理：从页顶到b1 */                                                   /* 设置页起始到结束位 */
+        u8 last_mask = (u8)(0xFFu >> (7 - b1));
+        write_col_byte(p1, x, last_mask);
+    }
+}
+
+/**
+ * @brief      Draw rectangle on display
+ * @param[in]  x: Top-left x coordinate
+ * @param[in]  y: Top-left y coordinate
+ * @param[in]  w: Width of rectangle
+ * @param[in]  h: Height of rectangle
+ * @param[in]  fill: Fill mode (true = filled, false = outline)
+ * @retval     None
+ */
+void draw_rect(u8 x, u8 y, u8 w, u8 h, bool fill)
+{
+    if (w == 0 || h == 0) return;
+
+    /* Calculate bottom-right corner (inclusive) */                                 /* 计算右下角坐标（包含） */
+    u8 x1 = x + w - 1;
+    u8 y1 = y + h - 1;
+
+    /* Clip to screen boundaries */                                                /* 裁剪到屏幕边界 */
+    if (x >= MAX_COL || y >= MAX_ROW) return;
+    if (x1 >= MAX_COL) x1 = MAX_COL - 1;
+    if (y1 >= MAX_ROW) y1 = MAX_ROW - 1;
+
+    if (fill)
+    {
+        /* Filled rectangle: draw vertical spans for each column */                 /* 实心矩形：每列绘制竖向跨度 */
+        for (u8 cx = x; cx <= x1; ++cx)
+        {
+            draw_vspan(cx, y, y1);
+        }
+    }
+    else
+    {
+        /* Outline rectangle: two horizontal lines + two vertical lines */          /* 空心矩形：两条水平线 + 两条垂直线 */
+        draw_hline(x, x1, y);                                                      /* Top edge 顶边 */
+        draw_hline(x, x1, y1);                                                     /* Bottom edge 底边 */
+
+        if (h >= 3)                                                                /* Avoid overlapping with top/bottom */
+        {
+            draw_vspan(x, y + 1, y1 - 1);                                          /* Left edge 左边 */
+            if (w >= 2) draw_vspan(x1, y + 1, y1 - 1);                             /* Right edge 右边 */
+        }
+        else if (w >= 2)
+        {
+            /* For small height (1 or 2 pixels), horizontal edges are sufficient */ /* 高度很小时，水平边已足够 */
+            draw_vspan(x, y, y1);                                                  /* Left edge 左边 */
+            draw_vspan(x1, y, y1);                                                 /* Right edge 右边 */
+        }
+    }
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //  Initialization

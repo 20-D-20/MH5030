@@ -5,7 +5,7 @@
 #include "I2c.h"
 //  
 // 定义全局IIC管理结构体和初始化配置结构体
-extern IICManager_ST        tps02r_iicmanger;
+extern IICManager_ST        g_stTps02r_IICManger;
 
 /**             
  * \broef 设备地址

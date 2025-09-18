@@ -81,7 +81,7 @@ typedef struct Pid
 
 
 typedef struct TuneObject {
-    uint8_t tuneEnable:2;                //整定与PID控制开关，0：PID控制；1：参数整定；2：整定失败
+    uint8_t tuneEnable:2;                 //整定与PID控制开关，0：PID控制；1：参数整定；2：整定失败
     uint8_t preEnable:2;                  //预处理使能，在开始整定前置位
     uint8_t initialStatus:1;              //记录开始整定前偏差的初始状态
     uint8_t outputStatus:1;               //记录输出的初始状态，0允许上升过零计数；1允许下降过零计数
@@ -106,14 +106,15 @@ typedef struct TuneObject {
 
 extern PidType g_stPidFront;;                       /* PID控制器全局实例 */
 extern TuneObjectType g_stPidFrontAuto;             /* PID自整定对象全局实例 */
-extern FilterCtx g_stFilter1;                   /* 前枪管滤波器结构体 */
-extern PidType g_stPidRear;;                       /* PID控制器全局实例 */
-extern TuneObjectType g_stPidRearAuto;             /* PID自整定对象全局实例 */       
-extern FilterCtx g_stFilter2;                   /* 腔体滤波器结构体 */
+extern FilterCtx g_stFilterFront;                   /* 前枪管滤波器结构体 */
+extern PidType g_stPidRear;;                        /* PID控制器全局实例 */
+extern TuneObjectType g_stPidRearAuto;              /* PID自整定对象全局实例 */       
+extern FilterCtx g_stFilterRear;                    /* 腔体滤波器结构体 */
 
 /* ---------------------- 函数声明区域 ---------------------- */
 
-void pid1_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter);              //PID初始化
+void pid_front_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter);              //PID初始化
+void pid_rear_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter);                 //PID初始化
 float median_filter(FilterCtx *ctx, float new_value);
 void filter_init(FilterCtx *ctx,uint8_t N,uint8_t MEDIAN_N,float limit_step);
 float sliding_average_filter(FilterCtx *ctx, float new_value);
