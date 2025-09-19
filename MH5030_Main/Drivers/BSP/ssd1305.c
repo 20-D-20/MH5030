@@ -198,6 +198,203 @@ void Disp_CharB(u8 x, u8 y, u8 asc_code, bool fb)
     }
 }
 
+/**
+ * @brief      显示一个 12x12 汉字（占用2页高度）
+ * @param[in]  x:       列起始位置（0 ~ MAX_COL-1）
+ * @param[in]  y:       行起始像素（0 ~ MAX_ROW）
+ * @param[in]  gb_code: 字符索引（用于 GB_12 表）
+ * @param[in]  fb:      反色标志：true 反色，false 正常
+ * @retval     None
+ */
+void dispHzChar12(u8 x, u8 y, u16 gb_code, bool fb)
+{
+    u8 i = 0;                                                     /* 循环计数器 */
+    u8 mask;                                                      /* 反色掩码 */
+    const u8 *pcode;                                              /* 字模数据指针 */
+    u8 temp_data;                                                 /* 临时数据 */
+    u8 page_start = y >> 3;                                       /* 起始页 */
+    u8 y_offset = y & 0x07;                                       /* 页内偏移 */
+
+    if (x >= MAX_COL || y > MAX_ROW - 12)    return;              /* 越界保护 */
+
+    pcode = GB_12[gb_code-1].Msk;                                   /* 取字模指针 */
+
+    if (fb)   mask = 0xFF;                                        /* 反色 */
+    else      mask = 0x00;                                        /* 正常显示 */
+
+    /* 12x12字体需要跨越2页显示 */                                         /* 处理跨页显示 */
+    /* 处理上半部分（第一页） */                                             /* 第一页数据 */
+    Set_Addr(page_start, x);
+    for (i = 0; i < 12; i++)                                      /* 12列 */
+    {
+        /* 从字模数据中获取当前列的上半部分 */                                    /* 移位处理 */
+        temp_data = pcode[i] >> y_offset;                        
+        Write_Data(temp_data ^ mask);
+    }
+
+    /* 处理下半部分（第二页） */                                             /* 第二页数据 */
+    Set_Addr(page_start + 1, x);
+    for (i = 0; i < 12; i++)                                      /* 12列 */
+    {
+        /* 组合当前列的数据 */                                            /* 跨页组合 */
+        temp_data = (pcode[i] << (8 - y_offset)) | (pcode[i + 12] >> y_offset);
+        Write_Data(temp_data ^ mask);
+    }
+    
+    /* 如果还需要第三页（当y_offset > 4时） */                                /* 特殊情况处理 */
+    if (y_offset >= 4 && (page_start + 2) < 8)
+    {
+        Set_Addr(page_start + 2, x);
+        for (i = 0; i < 12; i++)
+        {
+            temp_data = pcode[i + 12] << (8 - y_offset);
+            Write_Data(temp_data ^ mask);
+        }
+    }
+}
+
+/**
+ * @brief      在 GB_12 字模表中按 2 字节索引查找条目
+ * @param[in]  da: 指向 2 个字节的索引
+ * @retval     返回找到的下标，未找到返回 0
+ */
+u16 searchIndex12(const u8 da[2])
+{
+    u16 i;
+
+    for (i = 1; i <= NumOfGB12; i++)
+    {
+        if (da[0] == GB_12[i-1].Index[0] && da[1] == GB_12[i-1].Index[1])
+            return i;
+    }
+    return 0;                                                     /* 未找到 */
+}
+
+/**
+ * @brief      显示一个6x12 ASCII字符
+ * @param      x         列起始位置
+ * @param      y         行起始像素
+ * @param      asc_code  ASCII码('0'~'9', '+', '-', '*', '/', '℃')
+ * @param      fb        反色标志
+ */
+void Disp_Char_6x12(u8 x, u8 y, u8 asc_code, bool fb)
+{
+    u8 i;
+    u8 mask;
+    const u8 *pcode;
+    u8 index = 0;
+    
+    if (x + 6 > MAX_COL || y + 12 > MAX_ROW) return;
+    
+    // 根据ASCII码确定在asc_M数组中的索引
+    if (asc_code >= '0' && asc_code <= '9') {
+        if (asc_code == '0')
+            index = 9;  // '0'在数组的第9位
+        else
+            index = asc_code - '1';  // '1'~'9'对应0~8
+    }
+    else {
+        switch(asc_code) {
+            case '+':
+                index = 10;
+                break;
+            case '-':
+                index = 11;
+                break;
+            case '*':
+                index = 12;
+                break;
+            case '/':
+                index = 13;
+                break;
+            case 'R':
+                index = 14;
+                break;
+            case 'T':
+                index = 15;
+                break;
+            case ' ':  // 空格
+                // 直接清空显示区域
+                Set_Addr(y >> 3, x);
+                for(i = 0; i < 6; i++) Write_Data(0x00);
+                Set_Addr((y >> 3) + 1, x);
+                for(i = 0; i < 6; i++) Write_Data(0x00);
+                return;
+            default:
+                return;  // 不支持的字符
+        }
+    }
+    
+    pcode = asc_M[index].Msk;
+    mask = fb ? 0xFF : 0x00;
+    
+    // 6x12字体需要2页显示
+    // 前6字节是上半部分（8行）
+    Set_Addr(y >> 3, x);
+    for (i = 0; i < 6; i++) {
+        Write_Data(pcode[i] ^ mask);
+    }
+    
+    // 后6字节是下半部分（4行）
+    Set_Addr((y >> 3) + 1, x);
+    for (i = 0; i < 6; i++) {
+        Write_Data(pcode[i + 6] ^ mask);
+    }
+}
+
+/**
+ * @brief      混排显示字符串（6x12 ASCII + 12x12汉字）
+ * @param      x    列起始位置
+ * @param      y    行起始像素（必须是8的倍数以保证对齐）
+ * @param      str  字符串
+ * @param      Fb   反色标志
+ */
+void DispString12(u8 x, u8 y, const char* str, bool Fb)
+{
+    u16 hz_index = 0;
+    
+    while (*str)
+    {
+        if (*str < 0x80)  // ASCII字符
+        {
+            // 判断是否是支持的6x12字符
+            if ((*str >= '0' && *str <= '9') || 
+                *str == '+' || *str == '-' || 
+                *str == '*' || *str == '/' || 
+                *str == ' ' || *str == 'R'||*str == 'T')
+            {
+                Disp_Char_6x12(x, y, *str, Fb);  // 使用6x12字体
+                x += 6;  // 6x12字体宽度
+            }
+            else
+            {
+                // 其他ASCII使用原8x16字体
+                Disp_Char(x, y, *str, Fb);
+                x += 8;
+            }
+            str++;
+        }
+        else if ((*str >= 0x80) && (*(str + 1) >= 0x80))  // 汉字
+        {
+            hz_index = searchIndex12((const u8*)str);
+            if (hz_index != 0)  // 找到字体
+            {
+                dispHzChar12(x, y, hz_index, Fb);
+                x += 12;  // 12x12字体宽度
+            }
+            else  // 未找到，跳过
+            {
+                x += 12;
+            }
+            str += 2;
+        }
+        else
+        {
+            x += 8;
+            str++;
+        }
+    }
+}
 
 /**
  * @brief      显示一个 16x16 汉字（两页高度），支持反色
@@ -256,7 +453,7 @@ u16 searchIndex(uc8 da[2])
  * @param      Fb       反色标志：true 反色，false 正常
  * @retval     None
  */
-void DispString(u8 x, u8 y, cchar* str, bool Fb)
+void DispString(u8 x, u8 y, const char* str, bool Fb)
 {
     /* u16 max_cnt = 0;  若需统计已写入的字节数，可启用该变量 */                             /* 说明性注释 */
     u16 hz_index = 0;                                                      /* 汉字在 GB_16 表中的下标 */
@@ -736,6 +933,55 @@ void Show_Word_S(u8 x, u8 y, s32 Da, u8 maxFb, u8 Point, bool fb)
 }
 
 /**
+ * @brief      使用 8x16 字符显示带符号整数（固定小数点、左侧补 0）
+ * @param      x        列起始坐标（符号占 1 位，其后为数字位）
+ * @param      y        行起始像素坐标
+ * @param      Da       待显示数据（s32）
+ * @param      maxFb    数字位数（不含符号与小数点），最大 10；不足左侧补 0
+ * @param      Point    小数位数（0 表示无小数点；>0 时小数点位于从左数第 maxFb-Point 位数字之后）
+ * @param      fb       反色标志：true 反色，false 正常
+ * @retval     None
+ */
+void Disp_Word_UM(u16 x, u16 y, u8 maxFb, u32 Da, u8 PosFb, u8 Point)
+{
+    u32 div = 1;                 // 10^(maxFb-1)
+    u8  i;                       // 位下标 0..maxFb-1
+    const u8 W = 6;              // 6×12 字符宽度
+
+    if (x >= MAX_COL) return;               // 基本越界保护
+    if (maxFb > 10) maxFb = 10;             // 上限防呆
+    if (Point > maxFb) Point = maxFb;       // 规范化小数位
+
+    // 计算最高位除数
+    for (i = 1; i < maxFb; i++) div *= 10;
+
+    // 若需要小数点：插在从左数第 (maxFb-Point) 位数字之后
+    if (Point)
+    {
+        u16 dot_x = x + W * (maxFb - Point);     // 小数点的 X
+        // 这里直接用 6×12 的 '.' 字模
+        Disp_Char_6x12(dot_x, y, '.', false);
+    }
+
+    // 逐位输出（高位到低位），左侧不足补 0
+    for (i = 0; i < maxFb; i++)
+    {
+        u8 d = (u8)((Da / div) % 10);            // 当前位数字 0..9
+        u16 cx = x + W * i;
+
+        // 小数点之后的位整体右移 1 个字符宽度（给 '.' 腾位）
+        if (Point && i >= (maxFb - Point))
+            cx += W;
+
+        // 高亮/反色：当 (i+1) == PosFb 时反色显示该位，否则正常
+        Disp_Char_6x12(cx, y, (u8)('0' + d), (i + 1 == PosFb));
+
+        div /= 10;
+    }
+}
+
+
+/**
  * @brief      在列 x 处从底部向上绘制高度为 num 的实心竖条；支持全反色
  * @param      x        列坐标（0 ~ MAX_COL-1）
  * @param      num      竖条高度（像素，0 ~ MAX_ROW）
@@ -867,13 +1113,13 @@ void draw_vspan(u8 x, u8 y0, u8 y1)
         y1 = t;
     }
     
-    /* 边界检查 */                                                                  /* 超出屏幕范围则返回 */
+    /* 边界检查 */                                                               /* 超出屏幕范围则返回 */
     if (x >= MAX_COL || y0 >= MAX_ROW)
     {
         return;
     }
     
-    /* 裁剪y1到屏幕范围内 */                                                         /* 防止越界 */
+    /* 裁剪y1到屏幕范围内 */                                                        /* 防止越界 */
     if (y1 >= MAX_ROW)
     {
         y1 = MAX_ROW - 1;
@@ -887,7 +1133,7 @@ void draw_vspan(u8 x, u8 y0, u8 y1)
 
     if (p0 == p1)
     {
-        /* 同页处理：生成位掩码 */                                                   /* 设置b0到b1之间的位 */
+        /* 同页处理：生成位掩码 */                                                    /* 设置b0到b1之间的位 */
         u8 mask = (u8)((0xFFu << b0) & (0xFFu >> (7 - b1)));
         write_col_byte(p0, x, mask);
     }
@@ -897,7 +1143,7 @@ void draw_vspan(u8 x, u8 y0, u8 y1)
         u8 first_mask = (u8)(0xFFu << b0);
         write_col_byte(p0, x, first_mask);
 
-        /* 中间整页处理：全填充 */                                                   /* 完整页全部点亮 */
+        /* 中间整页处理：全填充 */                                                    /* 完整页全部点亮 */
         for (u8 p = p0 + 1; p < p1; ++p)
         {
             write_col_byte(p, x, 0xFF);
@@ -926,7 +1172,7 @@ void draw_rect(u8 x, u8 y, u8 w, u8 h, bool fill)
     u8 x1 = x + w - 1;
     u8 y1 = y + h - 1;
 
-    /* Clip to screen boundaries */                                                /* 裁剪到屏幕边界 */
+    /* Clip to screen boundaries */                                                 /* 裁剪到屏幕边界 */
     if (x >= MAX_COL || y >= MAX_ROW) return;
     if (x1 >= MAX_COL) x1 = MAX_COL - 1;
     if (y1 >= MAX_ROW) y1 = MAX_ROW - 1;
@@ -942,19 +1188,19 @@ void draw_rect(u8 x, u8 y, u8 w, u8 h, bool fill)
     else
     {
         /* Outline rectangle: two horizontal lines + two vertical lines */          /* 空心矩形：两条水平线 + 两条垂直线 */
-        draw_hline(x, x1, y);                                                      /* Top edge 顶边 */
-        draw_hline(x, x1, y1);                                                     /* Bottom edge 底边 */
+        draw_hline(x, x1, y);                                                       /* Top edge 顶边 */
+        draw_hline(x, x1, y1);                                                      /* Bottom edge 底边 */
 
-        if (h >= 3)                                                                /* Avoid overlapping with top/bottom */
+        if (h >= 3)                                                                 /* Avoid overlapping with top/bottom */
         {
-            draw_vspan(x, y + 1, y1 - 1);                                          /* Left edge 左边 */
-            if (w >= 2) draw_vspan(x1, y + 1, y1 - 1);                             /* Right edge 右边 */
+            draw_vspan(x, y + 1, y1 - 1);                                           /* Left edge 左边 */
+            if (w >= 2) draw_vspan(x1, y + 1, y1 - 1);                              /* Right edge 右边 */
         }
         else if (w >= 2)
         {
             /* For small height (1 or 2 pixels), horizontal edges are sufficient */ /* 高度很小时，水平边已足够 */
-            draw_vspan(x, y, y1);                                                  /* Left edge 左边 */
-            draw_vspan(x1, y, y1);                                                 /* Right edge 右边 */
+            draw_vspan(x, y, y1);                                                   /* Left edge 左边 */
+            draw_vspan(x1, y, y1);                                                  /* Right edge 右边 */
         }
     }
 }

@@ -186,19 +186,71 @@ int main(void)
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
   SSD1305_init();                                       
   clearscreen();
+  
+//             /* 起始界面 */
+//  DispString(40, 12, "MH5030",   false);
+//  DispString(28, 36, "Ver 1.0.0", false);
+/*************************************************/  
 
-// /* 起始界面 */
-//  DispString(40, 16, (unsigned char*)"MH5030",   false);
-//  DispString(28, 40, (unsigned char*)"Ver 1.0.0", false);
+        /* 枪管，腔体 温度显示界面 */
+   
+    DispString12(30, 0, "测量值", false);
+    DispString12(80, 0 ,"设定值", false);
+    
+    DispString12(0, 24, "枪管", false);
+    DispString12(0, 48, "腔体", false);
 
-    /*  */
-    DispString(0, 0, (unsigned char*)"温度",   false);
-//  draw_rect(10, 8, 50, 30, false);
+    /* 分割线 */
+    draw_hline(1, 127,16);
+
+    draw_rect(0,0,20,15,1);
+    /* 6*12 显示*/
+    Disp_Word_UM(38, 24, 3, 120, 0, 0);
+    Disp_Word_UM(38, 48, 3, 120, 0, 0);
+
+//    /* 8*16 显示*/
+//    Show_Word_U(36, 24, 101, 3, 0, false);
+//    DispString(60, 24, "℃", false);
+//    Show_Word_U(36, 48, 101, 3, 0, false);
+//    DispString(60, 48, "℃", false);
+    
+    Disp_Word_UM(88, 24, 3, 120, 0, 0);
+    Disp_Word_UM(88, 48, 3, 120, 0, 0);
+/*************************************************/  
+    
+          /* 枪管温度设置界面 */
+//    
+//    DispString(16, 0, "枪管温度设置", false);
+//   
+//    
+//              /* 分割线 */
+//    draw_hline(1, 127,20);
+//    
+//    Show_Word_U(48, 32, 101, 3, 0, false);
+//    DispString(74, 32, "℃", false);
+    
+/*************************************************/  
+
+//          /* 腔体温度设置界面 */
+//    
+//    DispString(16, 0, "腔体温度设置", false);
+//              /* 分割线 */
+//    draw_hline(1,127,20);
+//    
+//    Show_Word_U(48, 32, 120, 3, 0, false);
+//    DispString(74, 32, "℃", false);
+//    
+/*************************************************/  
+
+//    Show_Word_U(42, 24, 101, 3, 0, false);
+//    Show_Word_U(48, 28, 101, 4, 0, false);
+    //    draw_rect(40, 22, 48, 20, false);
 //  draw_hline(0,23,32,false);
-//  Show_Word_U(0, 0, 12311, 5, 2, false);   // 显示为 123.11
-//  Disp_Char(0, 10, 'A', false);                         
+//  Show_Word_U(48, 28, 1231, 4, 0, false);   // 显示为 123.11
+//    Disp_Char(60, 28, 'A', false);                         
 //  DispString(0, 0, (unsigned char*)"前枪管", false);    
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
+
   /* USER CODE END 2 */
 
 //  /* Call init function for freertos objects (in cmsis_os2.c) */
@@ -211,16 +263,10 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t num = 0;
+
   while (1)
   {
-//    num++;
-//    if(num >1000)
-//    {
-//        num = 0;
-//    }
-//    Show_Word_U(0, 0, num, 5, 0, true);   
-//    delay_ms(200);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

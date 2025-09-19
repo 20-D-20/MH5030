@@ -3,26 +3,26 @@
 #include "fan_control.h"
 
 /* Private typedef -----------------------------------------------------------*/
-typedef struct {
-    uint32_t pulse_count;            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-    uint32_t last_pulse_count;       // ï¿½Ï´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-    uint16_t rpm;                    // ×ªï¿½ï¿½ (RPM)
-//  uint16_t target_rpm;             // Ä¿ï¿½ï¿½×ªï¿½ï¿½
-    uint8_t  duty_cycle;             // PWMÕ¼ï¿½Õ±ï¿½ (0-100)
-    uint8_t  enable;                 // ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½×´Ì¬
-    uint8_t  fault;                  // ï¿½ï¿½ï¿½Ï±ï¿½Ö¾
-    uint32_t last_update_tick;       // ï¿½Ï´Î¸ï¿½ï¿½ï¿½Ê±ï¿½ï¿½
+typedef struct 
+{
+    uint32_t pulse_count;            /* Âö³å¼ÆÊý */
+    uint32_t last_pulse_count;       /* ÉÏ´ÎÂö³å¼ÆÊý */
+    uint16_t rpm;                    /* ×ªËÙ (RPM) */
+    uint8_t  duty_cycle;             /* PWMÕ¼¿Õ±È (0-100) */
+    uint8_t  enable;                 /* ·çÉÈÊ¹ÄÜ×´Ì¬ */
+    uint8_t  fault;                  /* ¹ÊÕÏ±êÖ¾ */
+    uint32_t last_update_tick;       /* ÉÏ´Î¸üÐÂÊ±¼ä´Á */
 } FanControl_t;
 
 /* Private define ------------------------------------------------------------*/
-#define FAN_PWM_FREQ        10000    // PWMÆµï¿½ï¿½ 10kHz
-#define FAN_PWM_PERIOD      1000     // PWMï¿½ï¿½ï¿½ï¿½Öµ (72MHz/10kHz)
-#define FAN_PULSE_PER_REV   2        // Ã¿×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-#define FAN_UPDATE_PERIOD   1000     // ×ªï¿½Ù¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ms)
-#define FAN_MIN_DUTY        0        // ï¿½ï¿½Ð¡Õ¼ï¿½Õ±ï¿½ (%)
-#define FAN_MAX_DUTY        100      // ï¿½ï¿½ï¿½Õ¼ï¿½Õ±ï¿½ (%)
-#define FAN_FAULT_THRESHOLD 100      // ï¿½ï¿½ï¿½Ï¼ï¿½ï¿½ï¿½ï¿½Öµ (RPM)
-                                     
+#define FAN_PWM_FREQ        10000    /* PWMÆµÂÊ 10kHz */
+#define FAN_PWM_PERIOD      1000     /* PWMÖÜÆÚÖµ (72MHz/10kHz) */
+#define FAN_PULSE_PER_REV   2        /* Ã¿×ªÂö³åÊý */
+#define FAN_UPDATE_PERIOD   1000     /* ×ªËÙ¸üÐÂÖÜÆÚ (ms) */
+#define FAN_MIN_DUTY        0        /* ×îÐ¡Õ¼¿Õ±È (%) */
+#define FAN_MAX_DUTY        100      /* ×î´óÕ¼¿Õ±È (%) */
+#define FAN_FAULT_THRESHOLD 100      /* ¹ÊÕÏ¼ì²âãÐÖµ (RPM) */
+
 /* Private variables ---------------------------------------------------------*/
 static FanControl_t fan = {0};
 
@@ -32,44 +32,43 @@ static void Fan_Capture_Init(void);
 static uint16_t Fan_CalculateRPM(uint32_t pulse_count, uint32_t period_ms);
 
 /* Public variables ---------------------------------------------------------*/
-FanStatus_t g_stFanStatus = {0};   	 /* ï¿½ï¿½Â¼ï¿½ï¿½ï¿½Èµï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ */
+FanStatus_t g_stFanStatus = {0};     /* ¼ÇÂ¼·çÉÈÔËÐÐ×´Ì¬ */
 
 /* Public functions ----------------------------------------------------------*/
 /**
-  * @brief  ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½È¿ï¿½ï¿½ï¿½
+  * @brief  ³õÊ¼»¯·çÉÈ¿ØÖÆÆ÷
   * @param  None
   * @retval None
   */
 void Fan_Init(void)
 {
-    // ï¿½ï¿½Ê¼ï¿½ï¿½PWMï¿½ï¿½ï¿½
+    /* ³õÊ¼»¯PWMÊä³ö */                                                           /* TIM3_CH1 - PB4 */
     Fan_PWM_Init();
     
-    // ï¿½ï¿½Ê¼ï¿½ï¿½×ªï¿½Ù²ï¿½ï¿½ï¿½
+    /* ³õÊ¼»¯×ªËÙ¼ì²â */                                                            /* FFGÐÅºÅÊäÈë */
     Fan_Capture_Init();
     
-    // ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½Ï²ï¿½ï¿½ï¿½
-    fan.duty_cycle = 85;      // Ä¬ï¿½ï¿½85%Õ¼ï¿½Õ±ï¿½
-    fan.enable = 0;           // Ä¬ï¿½Ï¹Ø±ï¿½
+    /* ÉèÖÃÄ¬ÈÏ²ÎÊý */                                                             /* Ä¬ÈÏÅäÖÃ */
+    fan.duty_cycle = 85;                                                     /* Ä¬ÈÏ85%Õ¼¿Õ±È */
+    fan.enable = 0;                                                          /* Ä¬ÈÏ¹Ø±Õ */
     
-    // ï¿½Ø±Õ·ï¿½ï¿½ï¿½
+    /* ¹Ø±Õ·çÉÈ */                                                               /* ³õÊ¼×´Ì¬ */
     Fan_Stop();
 }
 
-
 /**
-  * @brief  PWMï¿½ï¿½Ê¼ï¿½ï¿½ (TIM3_CH1 - PB4)
+  * @brief  PWM³õÊ¼»¯ (TIM3_CH1 - PB4)
   * @param  None
   * @retval None
   */
 static void Fan_PWM_Init(void)
 {
-    // ï¿½ï¿½ï¿½ï¿½PWM
-    HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
+    /* Æô¶¯PWMÊä³ö */                                                            /* TIM3Í¨µÀ1 */
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 }
 
 /**
-  * @brief  ×ªï¿½Ù²ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ 
+  * @brief  ×ªËÙ¼ì²â³õÊ¼»¯
   * @param  None
   * @retval None
   */
@@ -77,22 +76,22 @@ static void Fan_Capture_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     
-    // Ê¹ï¿½ï¿½Ê±ï¿½ï¿½
+    /* Ê¹ÄÜÊ±ÖÓ */                                                               /* GPIOAÊ±ÖÓ */
     __HAL_RCC_GPIOA_CLK_ENABLE();
     
-    // ï¿½ï¿½ï¿½ï¿½PA15Îªï¿½ï¿½ï¿½ï¿½ (FFGï¿½Åºï¿½)
+    /* ÅäÖÃPA15ÎªÊäÈë (FFGÐÅºÅ) */                                                  /* ÉÏÉýÑØ´¥·¢ */
     GPIO_InitStruct.Pin = FFG_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(FFG_GPIO_Port, &GPIO_InitStruct);
     
-    // ï¿½ï¿½ï¿½ï¿½ï¿½â²¿ï¿½Ð¶ï¿½
+    /* ÅäÖÃÍâ²¿ÖÐ¶Ï */                                                             /* ÓÅÏÈ¼¶ÉèÖÃ */
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 /**
-  * @brief  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+  * @brief  Æô¶¯·çÉÈ
   * @param  None
   * @retval None
   */
@@ -100,10 +99,10 @@ void Fan_Start(void)
 {
     if (!fan.enable) 
     {
-        // ï¿½ò¿ª·ï¿½ï¿½Èµï¿½Ô´ (FCTR = 0)
+        /* ¿ªÆô·çÉÈµçÔ´ (FCTR = 0) */                                              /* ¿ØÖÆÐÅºÅµÍµçÆ½ÓÐÐ§ */
         HAL_GPIO_WritePin(FCTR_GPIO_Port, FCTR_Pin, GPIO_PIN_RESET);
       
-        // ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½Õ¼ï¿½Õ±ï¿½
+        /* ÉèÖÃÄ¿±êÕ¼¿Õ±È */                                                        /* Ó¦ÓÃÉè¶¨Öµ */
         Fan_SetDutyCycle(fan.duty_cycle);
         fan.enable = 1;
         fan.pulse_count = 0;
@@ -113,16 +112,16 @@ void Fan_Start(void)
 }
 
 /**
-  * @brief  Í£Ö¹ï¿½ï¿½ï¿½ï¿½
+  * @brief  Í£Ö¹·çÉÈ
   * @param  None
   * @retval None
   */
 void Fan_Stop(void)
 {
-    // ï¿½Ø±Õ·ï¿½ï¿½Èµï¿½Ô´ (FCTR = 1)
+    /* ¹Ø±Õ·çÉÈµçÔ´ (FCTR = 1) */                                                  /* ¿ØÖÆÐÅºÅ¸ßµçÆ½¹Ø±Õ */
     HAL_GPIO_WritePin(FCTR_GPIO_Port, FCTR_Pin, GPIO_PIN_SET);
     
-    // PWMï¿½ï¿½ï¿½0
+    /* PWMÊä³öÖÃÁã */                                                            /* Í£Ö¹Êä³ö */
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
     
     fan.enable = 0;
@@ -131,8 +130,8 @@ void Fan_Stop(void)
 }
 
 /**
-  * @brief  ï¿½ï¿½ï¿½ï¿½PWMÕ¼ï¿½Õ±ï¿½
-  * @param  duty: Õ¼ï¿½Õ±ï¿½ (0-100)
+  * @brief  ÉèÖÃPWMÕ¼¿Õ±È
+  * @param  duty: Õ¼¿Õ±È (0-100)
   * @retval None
   */
 void Fan_SetDutyCycle(uint8_t duty)
@@ -144,26 +143,16 @@ void Fan_SetDutyCycle(uint8_t duty)
     
     fan.duty_cycle = duty;
     
-    // ï¿½ï¿½ï¿½ï¿½È½ï¿½Öµ
-     uint32_t compare = (FAN_PWM_PERIOD * duty) / 100;
+    /* ¼ÆËã±È½ÏÖµ */                                                              /* ¸ù¾ÝÕ¼¿Õ±È¼ÆËã */
+    uint32_t compare = (FAN_PWM_PERIOD * duty) / 100;
     
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, compare);
 }
 
-///**
-//  * @brief  ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½×ªï¿½ï¿½
-//  * @param  rpm: Ä¿ï¿½ï¿½×ªï¿½ï¿½
-//  * @retval None
-//  */
-//void Fan_SetTargetRPM(uint16_t rpm)
-//{
-//    fan.target_rpm = rpm;
-//}
-
 /**
-  * @brief  ï¿½ï¿½È¡ï¿½ï¿½Ç°×ªï¿½ï¿½
+  * @brief  »ñÈ¡µ±Ç°×ªËÙ
   * @param  None
-  * @retval ×ªï¿½ï¿½(RPM)
+  * @retval ×ªËÙ(RPM)
   */
 uint16_t Fan_GetRPM(void)
 {
@@ -171,9 +160,9 @@ uint16_t Fan_GetRPM(void)
 }
 
 /**
-  * @brief  ï¿½ï¿½È¡Õ¼ï¿½Õ±ï¿½
+  * @brief  »ñÈ¡Õ¼¿Õ±È
   * @param  None
-  * @retval Õ¼ï¿½Õ±ï¿½(0-100)
+  * @retval Õ¼¿Õ±È(0-100)
   */
 uint8_t Fan_GetDutyCycle(void)
 {
@@ -181,9 +170,9 @@ uint8_t Fan_GetDutyCycle(void)
 }
 
 /**
-  * @brief  ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½×´Ì¬
+  * @brief  »ñÈ¡·çÉÈ×´Ì¬
   * @param  None
-  * @retval 0:ï¿½ï¿½ï¿½ï¿½, 1:ï¿½ï¿½ï¿½ï¿½
+  * @retval 0:Õý³£, 1:¹ÊÕÏ
   */
 uint8_t Fan_GetFaultStatus(void)
 {
@@ -191,23 +180,23 @@ uint8_t Fan_GetFaultStatus(void)
 }
 
 /**
-  * @brief  ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½
-  * @param  pulse_count: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
-  * @param  period_ms: Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(ms)
-  * @retval ×ªï¿½ï¿½(RPM)
+  * @brief  ¼ÆËã×ªËÙ
+  * @param  pulse_count: Âö³å¼ÆÊý
+  * @param  period_ms: Ê±¼äÖÜÆÚ(ms)
+  * @retval ×ªËÙ(RPM)
   */
 static uint16_t Fan_CalculateRPM(uint32_t pulse_count, uint32_t period_ms)
 {
     if (period_ms == 0) return 0;
     
-    // RPM = (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ * 60000) / (Ã¿×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ * Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ms)
+    /* RPM = (Âö³åÊý * 60000) / (Ã¿×ªÂö³åÊý * Ê±¼äÖÜÆÚms) */                              /* ×ªËÙ¼ÆËã¹«Ê½ */
     uint32_t rpm = (pulse_count * 60000) / (FAN_PULSE_PER_REV * period_ms);
     
     return (uint16_t)rpm;
 }
 
 /**
-  * @brief  ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½×´Ì¬ (ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½)
+  * @brief  ¸üÐÂ·çÉÈ×´Ì¬ (ÐèÒªÔÚÑ­»·ÖÐµ÷ÓÃ)
   * @param  None
   * @retval None
   */
@@ -215,27 +204,28 @@ void Fan_Update(void)
 {
     uint32_t current_tick = HAL_GetTick();
     
-    // Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½×ªï¿½ï¿½
+    /* Ã¿¸ô¹Ì¶¨Ê±¼ä¸üÐÂ×ªËÙ */                                                          /* ÖÜÆÚ¸üÐÂ */
     if (current_tick - fan.last_update_tick >= FAN_UPDATE_PERIOD) 
     {
         uint32_t period = current_tick - fan.last_update_tick;
         uint32_t pulses = fan.pulse_count - fan.last_pulse_count;
         
-        // ï¿½ï¿½Öµï¿½Ë²ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½
+        /* ¼ÆËã²¢ÂË²¨×ªËÙÖµ */                                                        /* ÖÐÖµÂË²¨ */
         fan.rpm = Filter_Median(Fan_CalculateRPM(pulses, period));
 
-        // ï¿½ï¿½ï¿½Ï¼ï¿½ï¿½
+        /* ¹ÊÕÏ¼ì²â */                                                            /* ×ªËÙ¹ýµÍÅÐ¶Ï */
         if (fan.enable && fan.rpm < FAN_FAULT_THRESHOLD) 
         {
             fan.fault = 1;
-			g_stFanStatus.fault_consec ++;							/* ï¿½ï¿½ï¿½Æ´ï¿½ï¿½ï¿½Í³ï¿½ï¿½ */
+            g_stFanStatus.fault_consec++;                                     /* Á¬Ðø¹ÊÕÏ¼ÆÊý */
         } 
         else 
         {
             fan.fault = 0;
-			g_stFanStatus.fault_consec = 0;							/* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
+            g_stFanStatus.fault_consec = 0;                                   /* ÇåÁã¼ÆÊý */
         }       
-        // ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½
+        
+        /* ¸üÐÂ¼ÆÊý */                                                            /* ×¼±¸ÏÂ´Î¼ÆËã */
         fan.last_pulse_count = fan.pulse_count;
         fan.last_update_tick = current_tick;
     }
@@ -244,21 +234,21 @@ void Fan_Update(void)
 /* Interrupt Handlers --------------------------------------------------------*/
 
 /**
-  * @brief  ï¿½â²¿ï¿½Ð¶Ï»Øµï¿½ (×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
-  * @param  GPIO_Pin: ï¿½ï¿½ï¿½Åºï¿½
+  * @brief  Íâ²¿ÖÐ¶Ï»Øµ÷º¯Êý (×ªËÙÂö³å¼ÆÊý)
+  * @param  GPIO_Pin: Òý½Å±àºÅ
   * @retval None
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if (GPIO_Pin == FFG_Pin) 
     {
-        // FFGï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        /* FFGÂö³å¼ÆÊý */                                                         /* Ã¿´ÎÉÏÉýÑØ¼ÆÊý */
         fan.pulse_count++;
     }
 }
 
 /**
-  * @brief  EXTI1ï¿½Ð¶Ï·ï¿½ï¿½ï¿½ï¿½ï¿½
+  * @brief  EXTI1ÖÐ¶Ï·þÎñº¯Êý
   * @param  None
   * @retval None
   */
