@@ -30,7 +30,6 @@
 #include "tps02r.h"
 #include <stdio.h>
 #include "ssd1305.h"
-#include "tps02r.h"
 #include "FM24CXX.h"
 #include "onewire.h"
 #include "ds18b20.h"
@@ -40,7 +39,11 @@
 #include "fan_control.h"
 #include "iwdg.h"
 #include "key.h"
-#include "temp_monitor.h"
+#include "queue.h"
+#include "semphr.h"
+#include <stdlib.h>
+#include "pid_manager.h"
+#include "ui_manager.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,6 +64,14 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 
+// FreeRTOS对象
+QueueHandle_t UI_Queue = NULL;
+SemaphoreHandle_t Data_Mutex = NULL;
+
+// 任务句柄
+osThreadId Key_TaskHandle;
+osThreadId UI_TaskHandle;
+
 /* USER CODE END Variables */
 osThreadId HeaterCtrl_TaskHandle;
 osThreadId Fan_TaskHandle;
@@ -78,8 +89,10 @@ void fan_task(void const * argument);
 void tcouple_task(void const * argument);
 void ds18b20_task(void const * argument);
 void wdg_task(void const * argument);
-
+void key_task(void const * argument);
+void ui_task(void const * argument);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
@@ -105,6 +118,15 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackTy
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 
+  /* 初始化页面数据 */
+   init_page_data();
+   
+   /* 创建消息队列 */
+   UI_Queue = xQueueCreate(10, sizeof(UIMessage_t));
+   
+   /* 创建互斥量 */
+   Data_Mutex = xSemaphoreCreateMutex();
+
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -123,29 +145,37 @@ void MX_FREERTOS_Init(void) {
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* definition and creation of HeaterCtrl_Task */
-  osThreadDef(HeaterCtrl_Task, heaterctrl_task, osPriorityAboveNormal, 0, 128);
-  HeaterCtrl_TaskHandle = osThreadCreate(osThread(HeaterCtrl_Task), NULL);
+//  /* Create the thread(s) */
+//  /* definition and creation of HeaterCtrl_Task */
+//  osThreadDef(HeaterCtrl_Task, heaterctrl_task, osPriorityAboveNormal, 0, 128);
+//  HeaterCtrl_TaskHandle = osThreadCreate(osThread(HeaterCtrl_Task), NULL);
 
-  /* definition and creation of Fan_Task */
-  osThreadDef(Fan_Task, fan_task, osPriorityNormal, 0, 128);
-  Fan_TaskHandle = osThreadCreate(osThread(Fan_Task), NULL);
+//  /* definition and creation of Fan_Task */
+//  osThreadDef(Fan_Task, fan_task, osPriorityNormal, 0, 48);
+//  Fan_TaskHandle = osThreadCreate(osThread(Fan_Task), NULL);
 
-  /* definition and creation of TCouple_Task */
-  osThreadDef(TCouple_Task, tcouple_task, osPriorityIdle, 0, 128);
-  TCouple_TaskHandle = osThreadCreate(osThread(TCouple_Task), NULL);
+//  /* definition and creation of TCouple_Task */
+//  osThreadDef(TCouple_Task, tcouple_task, osPriorityNormal, 0, 64);
+//  TCouple_TaskHandle = osThreadCreate(osThread(TCouple_Task), NULL);
 
-  /* definition and creation of DS18B20_Task */
-  osThreadDef(DS18B20_Task, ds18b20_task, osPriorityIdle, 0, 128);
-  DS18B20_TaskHandle = osThreadCreate(osThread(DS18B20_Task), NULL);
+//  /* definition and creation of DS18B20_Task */
+//  osThreadDef(DS18B20_Task, ds18b20_task, osPriorityNormal, 0, 64);
+//  DS18B20_TaskHandle = osThreadCreate(osThread(DS18B20_Task), NULL);
 
   /* definition and creation of Wdg_Task */
-  osThreadDef(Wdg_Task, wdg_task, osPriorityIdle, 0, 64);
+  osThreadDef(Wdg_Task, wdg_task, osPriorityRealtime , 0, 32);
   Wdg_TaskHandle = osThreadCreate(osThread(Wdg_Task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  
+   /* 创建Key任务 */
+  osThreadDef(Key_Task, key_task, osPriorityHigh, 0, 64);
+  Key_TaskHandle = osThreadCreate(osThread(Key_Task), NULL);
+  
+  /* 创建UI任务 */
+  osThreadDef(UI_Task, ui_task, osPriorityNormal, 0, 256);
+  UI_TaskHandle = osThreadCreate(osThread(UI_Task), NULL);
+  
   /* USER CODE END RTOS_THREADS */
 
 }
@@ -160,48 +190,429 @@ void MX_FREERTOS_Init(void) {
 void heaterctrl_task(void const * argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-    tps02r_iic_init(&g_stTps02r_IICManger);                                     /* Initialize tps02r */
-    pid_front_init(&g_stPidFront,&g_stPidFrontAuto,&g_stFilterFront);           /* Initialize front PID controller */
-    pid_rear_init(&g_stPidRear,&g_stPidRearAuto, &g_stFilterRear);              /* Initialize rear PID controller */
-    float pt100_front = 0;                                                      /* Record front temperature */
-    float pt100_rear = 0;                                                       /* Record rear temperature */
-  /* Infinite loop */
-  for(;;)
-  {
-          
-     if(tps02r_get_temp(TPS02R_CHAN2,&pt100_front) == TPS02R_FUN_OK)          
-     {
-           g_stPidFront.Pv = combined_filter(&g_stFilterFront,pt100_front);     
-           #ifdef Test
-                RelayFeedbackAutoTuning(&g_stPidFront, &g_stPidFrontAuto);
-           #endif
-         
-           #ifdef Run    
-                RUN(&g_stPidFront, &g_stPidFrontAuto);
-           #endif
+    float pt100_front = 0;                                              /* 记录前枪管温度 */
+    float pt100_rear = 0;                                               /* 记录腔体温度 */
+    uint8_t init_flag = 0;                                              /* 初始化标志 */
     
-            PID_Calc(&g_stPidFront, &g_stPidFrontAuto);                    
-            TIM4->CCR4 = g_stPidFront.OUT - 1;        
-     }
-     
-     if(tps02r_get_temp(TPS02R_CHAN1,&pt100_rear) == TPS02R_FUN_OK)          
-     {
-           g_stPidRear.Pv = combined_filter(&g_stFilterFront,pt100_rear);     
-           #ifdef Test
-                RelayFeedbackAutoTuning(&g_stPidRear, &g_stPidRearAuto);
-           #endif
-         
-           #ifdef Run    
-                RUN(&g_stPidRear, &g_stPidRearAuto);
-           #endif
+    /* 硬件初始化 */
+    tps02r_iic_init(&g_stTps02r_IICManger);                            /* 初始化tps02r */
+    FM24CXX_iic_init(&fm24cxx_iicmanager);                             /* 初始化EEPROM */
     
-            PID_Calc(&g_stPidRear, &g_stPidRearAuto);                    
-            TIM1->CCR2 = g_stPidRear.OUT - 1;        
-     }
-
-    osDelay(200);
-  }
+    /* PID系统初始化 */
+    pid_front_init(&g_stPidFront, &g_stPidFrontAuto, &g_stFilterFront);/* 初始化前枪管PID参数 */
+    pid_rear_init(&g_stPidRear, &g_stPidRearAuto, &g_stFilterRear);    /* 初始化腔体PID参数 */
+    
+    /* 参数管理器初始化 */
+    Init_PID_Manager();
+    
+    /* 检查EEPROM */
+    if (FM_Check() != 0)
+    {
+        g_system_status.error_code = 1;                                /* EEPROM错误 */
+    }
+    
+    /* Infinite loop */
+    for(;;)
+    {
+        /* 读取前枪管温度 */
+        if (tps02r_get_temp(TPS02R_CHAN1, &pt100_front) == TPS02R_FUN_OK)          
+        {
+            /* 滤波处理 */
+            g_stPidFront.Pv = combined_filter(&g_stFilterFront, pt100_front);
+            g_system_status.front_temp_pv = g_stPidFront.Pv;
+        }
+        else
+        {
+            g_system_status.temp_error |= 0x01;                        /* 前枪管温度读取错误 */
+        }
+        
+        /* 读取腔体温度 */
+        if (tps02r_get_temp(TPS02R_CHAN2, &pt100_rear) == TPS02R_FUN_OK)          
+        {
+            /* 滤波处理 */
+            g_stPidRear.Pv = combined_filter(&g_stFilterRear, pt100_rear);
+            g_system_status.rear_temp_pv = g_stPidRear.Pv;
+        }
+        else
+        {
+            g_system_status.temp_error |= 0x02;                        /* 腔体温度读取错误 */
+        }
+        
+        /* 更新设定值 */
+        g_stPidFront.Sv = g_system_status.front_temp_sv;
+        g_stPidRear.Sv = g_system_status.rear_temp_sv;
+        
+        /* 检查是否需要切换参数组 */
+        if (g_system_status.mode != MODE_AUTOTUNE)
+        {
+            Check_And_Switch_Group();
+        }
+        
+        /* 处理自整定请求 */
+        if (g_system_status.autotune_request)
+        {
+            /* 设置自整定模式 */
+            g_stPidFrontAuto.tuneEnable = 1;
+            g_stPidRearAuto.tuneEnable = 1;
+            g_system_status.autotune_request = 0;
+        }
+        
+        /* 根据运行模式执行不同逻辑 */
+        if (g_system_status.mode == MODE_AUTOTUNE)
+        {
+            /* 自整定模式：两路同时进行 */
+            RelayFeedbackAutoTuning(&g_stPidFront, &g_stPidFrontAuto);
+            RelayFeedbackAutoTuning(&g_stPidRear, &g_stPidRearAuto);
+            
+            /* 检查自整定是否完成 */
+            Check_Autotune_Complete();
+        }
+        else if (g_system_status.mode == MODE_RUN)
+        {
+            /* 运行模式：执行PID控制 */
+            PID_Calc(&g_stPidFront, &g_stPidFrontAuto);
+            PID_Calc(&g_stPidRear, &g_stPidRearAuto);
+        }
+        else
+        {
+            /* 停止模式：输出置零 */
+            g_stPidFront.OUT = 0;
+            g_stPidRear.OUT = 0;
+        }
+        
+        /* 更新PWM输出 */
+        if (g_stPidFront.OUT > 0)
+        {
+            TIM4->CCR4 = g_stPidFront.OUT - 1;
+        }
+        else
+        {
+            TIM4->CCR4 = 0;
+        }
+        
+        if (g_stPidRear.OUT > 0)
+        {
+            TIM1->CCR2 = g_stPidRear.OUT - 1;
+        }
+        else
+        {
+            TIM1->CCR2 = 0;
+        }
+        
+        osDelay(200);
+    }
   /* USER CODE END StartDefaultTask */
+}
+
+/**
+ * @brief      按键任务（页面/模式/参数编辑逻辑）
+ * @param[in]  argument: 未使用
+ * @retval     None
+ * @note       行为：
+ *             - 开机显示"启动页面"2秒后自动切换到"温度显示页面"
+ *             - 浏览模式：UP/DOWN 翻页；CONFIRM 进入编辑
+ *             - 编辑模式：UP/DOWN 按步进修改数值；RETURN 退出编辑
+ *             - 收到事件后向 UI 任务发送消息（队列），并用互斥量保护共享数据
+ *             - 周期：~20ms 扫描
+ */
+void key_task(void const * argument)
+{
+    UIMessage_t msg;
+    uint8_t key = 0;
+    uint8_t key_count = 0;
+    uint8_t last_key = 0;
+    uint32_t startup_timer = 0;
+    int16_t old_value, new_value;
+    
+    /* 启动页面显示计时 */                                                  /* 记录启动时间 */
+    startup_timer = osKernelSysTick();
+    
+    for(;;)
+    {
+        /* 自动切换启动页面 */                                              /* 2秒后自动切换 */
+        if(g_current_page_id == PAGE_STARTUP && 
+           (osKernelSysTick() - startup_timer) > 2000)              /* 2秒后自动切换 */
+        {
+            xSemaphoreTake(Data_Mutex, portMAX_DELAY);
+            g_current_page_id = PAGE_TEMP_DISPLAY;
+            xSemaphoreGive(Data_Mutex);
+            
+            msg.msg_type = MSG_PAGE_CHANGE;
+            msg.page_id = PAGE_TEMP_DISPLAY;
+            msg.refresh_type = 1;                                   /* FULL_REFRESH */
+            xQueueSend(UI_Queue, &msg, 0);
+        }
+        
+        /* 按键扫描 */                                                  /* 检测按键输入 */
+        key = key_scan(0);                                          /* 不支持连按模式 */
+        
+        if(key != 0)
+        {
+            xSemaphoreTake(Data_Mutex, portMAX_DELAY);
+            
+            if(g_current_mode == MODE_BROWSE)
+            {
+                switch(key)
+                {
+                    case KEY_UP:                                    /* 前翻页 */
+                        if(g_current_page_id > PAGE_TEMP_DISPLAY)
+                        {
+                            g_current_page_id--;
+                        }
+                        else if(g_current_page_id == PAGE_TEMP_DISPLAY)
+                        {
+                            g_current_page_id = PAGE_CAVITY_SETTING; /* 循环到最后页 */
+                        }
+                        
+                        msg.msg_type = MSG_PAGE_CHANGE;
+                        msg.page_id = g_current_page_id;
+                        msg.refresh_type = 1;
+                        xQueueSend(UI_Queue, &msg, 0);
+                        break;
+                    
+                    case KEY_DOWN:                                  /* 后翻页 */
+                        if(g_current_page_id < PAGE_CAVITY_SETTING && 
+                           g_current_page_id != PAGE_STARTUP)
+                        {
+                            g_current_page_id++;
+                        }
+                        else if(g_current_page_id == PAGE_CAVITY_SETTING)
+                        {
+                            g_current_page_id = PAGE_TEMP_DISPLAY;   /* 循环到第一页 */
+                        }
+                        
+                        msg.msg_type = MSG_PAGE_CHANGE;
+                        msg.page_id = g_current_page_id;
+                        msg.refresh_type = 1;
+                        xQueueSend(UI_Queue, &msg, 0);
+                        break;
+                    
+                    case KEY_CONFIRM:                               /* 确认键 - 进入编辑模式 */
+                        if(g_pages[g_current_page_id].is_editable)
+                        {
+                            g_current_mode = MODE_EDIT;
+                            msg.msg_type = MSG_MODE_CHANGE;
+                            msg.page_id = g_current_page_id;
+                            msg.refresh_type = 0;                   /* VALUE_ONLY */
+                            xQueueSend(UI_Queue, &msg, 0);
+                        }
+                        break;
+                    
+                    case KEY_RETURN:                                /* ESC键在浏览模式下无操作 */
+                        break;
+                }
+            }
+            else if(g_current_mode == MODE_EDIT)
+            {
+                switch(key)
+                {
+                    case KEY_UP:                                    /* 增加数值 */
+                        old_value = g_pages[g_current_page_id].current_value;
+                        new_value = old_value + g_pages[g_current_page_id].step;
+                        
+                        if(new_value > g_pages[g_current_page_id].max_value)
+                            new_value = g_pages[g_current_page_id].max_value;
+                        
+                        if(new_value != old_value)
+                        {
+                            g_pages[g_current_page_id].current_value = new_value;
+                            
+                            /* TODO: 这里添加保存参数的代码 */        /* 参数保存功能 */
+                            /* save_parameter(g_current_page_id, new_value); */
+                            
+                            msg.msg_type = MSG_VALUE_UPDATE;
+                            msg.page_id = g_current_page_id;
+                            msg.new_value = new_value;
+                            msg.refresh_type = 0;
+                            xQueueSend(UI_Queue, &msg, 0);
+                        }
+                        break;
+                    
+                    case KEY_DOWN:                                  /* 减小数值 */
+                        old_value = g_pages[g_current_page_id].current_value;
+                        new_value = old_value - g_pages[g_current_page_id].step;
+                        
+                        if(new_value < g_pages[g_current_page_id].min_value)
+                            new_value = g_pages[g_current_page_id].min_value;
+                        
+                        if(new_value != old_value)
+                        {
+                            g_pages[g_current_page_id].current_value = new_value;
+                            
+                            /* TODO: 这里添加保存参数的代码 */        /* 参数保存功能 */
+                            /* save_parameter(g_current_page_id, new_value); */
+                            
+                            msg.msg_type = MSG_VALUE_UPDATE;
+                            msg.page_id = g_current_page_id;
+                            msg.new_value = new_value;
+                            msg.refresh_type = 0;
+                            xQueueSend(UI_Queue, &msg, 0);
+                        }
+                        break;
+                    
+                    case KEY_CONFIRM:                               /* 确认键在编辑模式下无操作 */
+                        break;
+                    
+                    case KEY_RETURN:                                /* 退出编辑模式 */
+                        g_current_mode = MODE_BROWSE;
+                        msg.msg_type = MSG_MODE_CHANGE;
+                        msg.page_id = g_current_page_id;
+                        msg.refresh_type = 0;
+                        xQueueSend(UI_Queue, &msg, 0);
+                        break;
+                }
+            }
+            
+            xSemaphoreGive(Data_Mutex);
+        }
+        
+        osDelay(20);                                                /* 20ms扫描周期 */
+    }
+}
+
+/**
+ * @brief  UI 任务（OLED 页面渲染与实时刷新）
+ * @param  argument  未使用
+ * @retval None
+ *
+ * 行为：
+ * - 初始化 OLED，显示启动画面
+ * - 处理队列消息：页面切换、数值局刷、模式切换
+ * - 在温度显示页每 500ms 更新一次测量值
+ * - 周期：~20ms 刷新
+ */
+void ui_task(void const * argument)
+{
+    UIMessage_t msg;
+    uint32_t realtime_counter = 0;
+    bool need_temp_update = false;
+    
+    /* 初始化OLED */
+    SSD1305_init();
+    clearscreen();
+    
+    /* 显示启动页面 */
+    DispString(40, 12, "MH5030", false);
+    DispString(28, 36, "Ver 1.0.0", false);
+    
+    for(;;)
+    {
+        /* 检查消息队列 */
+        if(xQueueReceive(UI_Queue, &msg, 0) == pdTRUE)
+        {
+            switch(msg.msg_type)
+            {
+                case MSG_PAGE_CHANGE:
+                    /* 页面切换 - 全刷新 */
+                    clearscreen();
+                    
+                    switch(msg.page_id)
+                    {
+                        case PAGE_TEMP_DISPLAY:
+                            /* 温度显示界面 */
+                            DispString12(30, 0, "测量值", false);
+                            DispString12(80, 0, "设定值", false);
+                            DispString12(0, 24, "枪管", false);
+                            DispString12(0, 48, "腔体", false);
+                            draw_hline(1, 127, 16);
+                            draw_rect(0,0,20,15,1);
+                        
+                            /* 显示测量值 */
+                            get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
+                            Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
+                            Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
+                            
+                            /* 显示设定值 */
+                            Disp_Word_UM(88, 24, 3, g_pages[PAGE_GUN_SETTING].current_value, 0, 0);
+                            Disp_Word_UM(88, 48, 3, g_pages[PAGE_CAVITY_SETTING].current_value, 0, 0);
+                            break;
+                        
+                        case PAGE_GUN_SETTING:
+                            /* 枪管温度设置界面 */
+                            DispString(16, 0, "枪管温度设置", false);
+                            draw_hline(1, 127, 20);
+                            Show_Word_U(48, 32, g_pages[PAGE_GUN_SETTING].current_value, 3, 0, false);
+                            DispString(74, 32, "℃", false);
+                            break;
+                        
+                        case PAGE_CAVITY_SETTING:
+                            /* 腔体温度设置界面 */
+                            DispString(16, 0, "腔体温度设置", false);
+                            draw_hline(1, 127, 20);
+                            Show_Word_U(48, 32, g_pages[PAGE_CAVITY_SETTING].current_value, 3, 0, false);
+                            DispString(74, 32, "℃", false);
+                            break;
+                    }
+                    break;
+                
+                case MSG_VALUE_UPDATE:
+                    /* 数值更新 - 局部刷新 */
+                    if(msg.page_id == PAGE_GUN_SETTING)
+                    {
+                        Show_Word_U(48, 32, msg.new_value, 3, 0, g_current_mode == MODE_EDIT);
+                    }
+                    else if(msg.page_id == PAGE_CAVITY_SETTING)
+                    {
+                        Show_Word_U(48, 32, msg.new_value, 3, 0, g_current_mode == MODE_EDIT);
+                    }
+                    break;
+                
+                case MSG_MODE_CHANGE:
+                    /* 模式切换 */
+                    if(g_current_mode == MODE_EDIT)
+                    {
+                        /* 进入编辑模式 - 数值反显 */
+                        if(msg.page_id == PAGE_GUN_SETTING)
+                        {
+                            Show_Word_U(48, 32, g_pages[PAGE_GUN_SETTING].current_value, 3, 0, true);
+                        }
+                        else if(msg.page_id == PAGE_CAVITY_SETTING)
+                        {
+                            Show_Word_U(48, 32, g_pages[PAGE_CAVITY_SETTING].current_value, 3, 0, true);
+                        }
+                    }
+                    else
+                    {
+                        /* 退出编辑模式 - 正常显示 */
+                        if(msg.page_id == PAGE_GUN_SETTING)
+                        {
+                            Show_Word_U(48, 32, g_pages[PAGE_GUN_SETTING].current_value, 3, 0, false);
+                        }
+                        else if(msg.page_id == PAGE_CAVITY_SETTING)
+                        {
+                            Show_Word_U(48, 32, g_pages[PAGE_CAVITY_SETTING].current_value, 3, 0, false);
+                        }
+                    }
+                    break;
+            }
+        }
+        
+        /* 实时数据更新（仅在温度显示页面） */
+        realtime_counter++;
+        if(realtime_counter >= 25)  // 25*20ms = 500ms
+        {
+            realtime_counter = 0;
+            
+            xSemaphoreTake(Data_Mutex, portMAX_DELAY);
+            if(g_current_page_id == PAGE_TEMP_DISPLAY && g_current_mode == MODE_BROWSE)
+            {
+                /* 更新温度测量值 */
+                get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
+                need_temp_update = true;
+            }
+            xSemaphoreGive(Data_Mutex);
+            
+            if(need_temp_update)
+            {
+                /* 刷新显示 */
+                Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
+                Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
+                need_temp_update = false;
+            }
+        }
+        
+        osDelay(20);  // 20ms刷新周期
+    }
 }
 
 /* USER CODE BEGIN Header_fan_task */
@@ -216,6 +627,7 @@ void fan_task(void const * argument)
   /* USER CODE BEGIN fan_task */
     Fan_Init();                                                  /* Fan initialization */
     Fan_Start();                                                 /* Start fan, default duty cycle 85% */
+    Filter_Init_All();                                           /* 初始化滤波器 */
   /* Infinite loop */
     for(;;)
     {
@@ -224,7 +636,10 @@ void fan_task(void const * argument)
         { 
             HAL_GPIO_WritePin(GPIOB, BELL_Pin, GPIO_PIN_SET);    /* Trigger alarm */
             g_stFanStatus.fault = 1;                             /* Set fault flag */
-        } 
+        }else
+        {
+             HAL_GPIO_WritePin(GPIOB, BELL_Pin, GPIO_PIN_RESET);
+        }
         osDelay(200);
     }
   /* USER CODE END fan_task */
@@ -326,6 +741,7 @@ void wdg_task(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
 
 /* USER CODE END Application */
 

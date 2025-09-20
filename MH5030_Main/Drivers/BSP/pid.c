@@ -98,7 +98,7 @@ void pid_rear_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter)
  * @retval    void
  * @note      初始化TuneObjectType各成员并根据当前设定/测量状态赋初值
  */
-static void TunePretreatment(PidType *vPID, TuneObjectType *tune)
+void TunePretreatment(PidType *vPID, TuneObjectType *tune)
 {
     tune->maxPV            = 0;                /* 最大过程量清零 */
     tune->minPV            = 0;                /* 最小过程量清零 */

@@ -2,7 +2,6 @@
 #define ONEWIRE_H 
 
 #include "delay.h"
-#include "ds18b20Config.h"
 #include "tim.h"
 
 /* C++ detection */

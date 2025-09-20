@@ -49,8 +49,8 @@ void Fan_Init(void)
     Fan_Capture_Init();
     
     /* 设置默认参数 */                                                             /* 默认配置 */
-    fan.duty_cycle = 85;                                                     /* 默认85%占空比 */
-    fan.enable = 0;                                                          /* 默认关闭 */
+    fan.duty_cycle = 95;                                                         /* 默认85%占空比 */
+    fan.enable = 0;                                                              /* 默认关闭 */
     
     /* 关闭风扇 */                                                               /* 初始状态 */
     Fan_Stop();

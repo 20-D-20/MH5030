@@ -122,7 +122,7 @@ float combined_filter(FilterCtx *ctx, float new_value);
 float amplitude_limit_filter(FilterCtx *ctx, float new_value);
 
 float PID_Calc(PidType *vPID,TuneObjectType *tune);                                    //PID计算
-static void TunePretreatment(PidType *vPID,TuneObjectType *tune);                      //自整定参数预处理
+void TunePretreatment(PidType *vPID,TuneObjectType *tune);                      //自整定参数预处理
 void RelayFeedbackAutoTuning(PidType *vPID,TuneObjectType *tune);                      //自整定
 void RUN(PidType *vPID,TuneObjectType *tune);
 static void CalculationParameters(PidType *vPID,TuneObjectType *tune);                 //参数计算

@@ -723,14 +723,19 @@
               <FilePath>..\Drivers\BSP\key.c</FilePath>
             </File>
             <File>
-              <FileName>temp_monitor.c</FileName>
+              <FileName>pid_manager.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Drivers\BSP\temp_monitor.c</FilePath>
+              <FilePath>..\Drivers\BSP\pid_manager.c</FilePath>
             </File>
             <File>
-              <FileName>temp_monitor.h</FileName>
+              <FileName>ui_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\ui_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>ui_manager.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Drivers\BSP\temp_monitor.h</FilePath>
+              <FilePath>..\Drivers\BSP\ui_manager.h</FilePath>
             </File>
           </Files>
         </Group>

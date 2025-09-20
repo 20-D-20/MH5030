@@ -42,7 +42,6 @@
 #include "pid.h"
 #include "fan_control.h"
 #include "key.h"
-#include "temp_monitor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -184,41 +183,41 @@ int main(void)
 
   
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
-  SSD1305_init();                                       
-  clearscreen();
-  
+//  SSD1305_init();                                       
+//  clearscreen();
+//  
 //             /* 起始界面 */
 //  DispString(40, 12, "MH5030",   false);
 //  DispString(28, 36, "Ver 1.0.0", false);
 /*************************************************/  
 
-        /* 枪管，腔体 温度显示界面 */
-   
-    DispString12(30, 0, "测量值", false);
-    DispString12(80, 0 ,"设定值", false);
-    
-    DispString12(0, 24, "枪管", false);
-    DispString12(0, 48, "腔体", false);
+//        /* 枪管，腔体 温度显示界面 */
+//   
+//    DispString12(30, 0, "测量值", false);
+//    DispString12(80, 0 ,"设定值", false);
+//    
+//    DispString12(0, 24, "枪管", false);
+//    DispString12(0, 48, "腔体", false);
 
-    /* 分割线 */
-    draw_hline(1, 127,16);
+//    /* 分割线 */
+//    draw_hline(1, 127,16);
 
-    draw_rect(0,0,20,15,1);
-    /* 6*12 显示*/
-    Disp_Word_UM(38, 24, 3, 120, 0, 0);
-    Disp_Word_UM(38, 48, 3, 120, 0, 0);
+//    draw_rect(0,0,20,15,1);
+//    /* 6*12 显示*/
+//    Disp_Word_UM(38, 24, 3, 120, 0, 0);
+//    Disp_Word_UM(38, 48, 3, 120, 0, 0);
 
-//    /* 8*16 显示*/
-//    Show_Word_U(36, 24, 101, 3, 0, false);
-//    DispString(60, 24, "℃", false);
-//    Show_Word_U(36, 48, 101, 3, 0, false);
-//    DispString(60, 48, "℃", false);
-    
-    Disp_Word_UM(88, 24, 3, 120, 0, 0);
-    Disp_Word_UM(88, 48, 3, 120, 0, 0);
+////    /* 8*16 显示*/
+////    Show_Word_U(36, 24, 101, 3, 0, false);
+////    DispString(60, 24, "℃", false);
+////    Show_Word_U(36, 48, 101, 3, 0, false);
+////    DispString(60, 48, "℃", false);
+//    
+//    Disp_Word_UM(88, 24, 3, 120, 0, 0);
+//    Disp_Word_UM(88, 48, 3, 120, 0, 0);
 /*************************************************/  
     
-          /* 枪管温度设置界面 */
+//          /* 枪管温度设置界面 */
 //    
 //    DispString(16, 0, "枪管温度设置", false);
 //   
@@ -228,7 +227,7 @@ int main(void)
 //    
 //    Show_Word_U(48, 32, 101, 3, 0, false);
 //    DispString(74, 32, "℃", false);
-    
+//    
 /*************************************************/  
 
 //          /* 腔体温度设置界面 */
@@ -242,22 +241,15 @@ int main(void)
 //    
 /*************************************************/  
 
-//    Show_Word_U(42, 24, 101, 3, 0, false);
-//    Show_Word_U(48, 28, 101, 4, 0, false);
-    //    draw_rect(40, 22, 48, 20, false);
-//  draw_hline(0,23,32,false);
-//  Show_Word_U(48, 28, 1231, 4, 0, false);   // 显示为 123.11
-//    Disp_Char(60, 28, 'A', false);                         
-//  DispString(0, 0, (unsigned char*)"前枪管", false);    
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
 
   /* USER CODE END 2 */
 
-//  /* Call init function for freertos objects (in cmsis_os2.c) */
-//  MX_FREERTOS_Init();
+  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
 
-//  /* Start scheduler */
-//  osKernelStart();
+  /* Start scheduler */
+  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
