@@ -265,7 +265,7 @@ int main(void)
 //    Show_Word_U(78, 32, 101, 3, 0, false);
 //    DispString(102, 32, "℃", false);
 
-/*************************************************/  
+///*************************************************/  
 
 //          /* 智能温控调节界面 */
 //    DispString(16, 0, "智能温控调节", false);
@@ -276,18 +276,18 @@ int main(void)
 //    Show_Word_U(72, 32, 1, 1, 0, true);
 //    DispString(80, 32, "/", false);
 //    Show_Word_U(88, 32, 7, 1, 0, false);
-    
-///*************************************************/  
+//    
+/////*************************************************/  
 
-          /* 智能温控调节进度界面 */
-    DispString(16, 0, "智能温控调节", false);
-              /* 分割线 */
-      draw_hline(1,127,20);
+//          /* 智能温控调节进度界面 */
+//    DispString(16, 0, "智能温控调节", false);
+//              /* 分割线 */
+//      draw_hline(1,127,20);
 
-    DispString(32, 32, "进度:", false);
-    Show_Word_U(72, 32, 1, 1, 0, true);
-    DispString(80, 32, "/", false);
-    Show_Word_U(88, 32, 5, 1, 0, false);
+//    DispString(32, 32, "进度:", false);
+//    Show_Word_U(72, 32, 1, 1, 0, true);
+//    DispString(80, 32, "/", false);
+//    Show_Word_U(88, 32, 5, 1, 0, false);
     
 ///*************************************************/  
 
@@ -295,11 +295,11 @@ int main(void)
 
   /* USER CODE END 2 */
 
-//  /* Call init function for freertos objects (in cmsis_os2.c) */
-//  MX_FREERTOS_Init();
+  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
 
-//  /* Start scheduler */
-//  osKernelStart();
+  /* Start scheduler */
+  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 

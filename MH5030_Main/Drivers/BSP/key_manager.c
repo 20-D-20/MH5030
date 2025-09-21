@@ -1,28 +1,16 @@
 #include "key_manager.h"
-#include "FM24CXX.h"
 
-/* 全局变量 */
-KeyManager_t g_key_manager = {0};
+/* 全局变量定义 */
+KeyPressCounter_t g_key_counter = {0};
 
 /**
  * @brief  初始化按键管理器
  */
 void Key_Manager_Init(void)
 {
-    memset(&g_key_manager, 0, sizeof(KeyManager_t));
-}
-
-/**
- * @brief  发送UI消息
- */
-void Send_UI_Message(MsgType_e type, uint8_t page_id, int16_t value, uint8_t refresh_type)
-{
-    UIMessage_t msg;
-    msg.msg_type = type;
-    msg.page_id = page_id;
-    msg.new_value = value;
-    msg.refresh_type = refresh_type;
-    xQueueSend(UI_Queue, &msg, 0);
+    g_key_counter.ok_press_count = 0;
+    g_key_counter.last_press_time = 0;
+    g_key_counter.autotune_triggered = 0;
 }
 
 /**
@@ -30,35 +18,37 @@ void Send_UI_Message(MsgType_e type, uint8_t page_id, int16_t value, uint8_t ref
  */
 void Process_Browse_Mode_Key(uint8_t key)
 {
+//    UIMessage_t msg;
     switch(key)
     {
-        case KEY_UP:
+        case KEY_UP:  /* 前翻页 */
             Handle_Page_Navigation(KEY_UP);
             break;
             
-        case KEY_DOWN:
+        case KEY_DOWN:  /* 后翻页 */
             Handle_Page_Navigation(KEY_DOWN);
             break;
             
-        case KEY_CONFIRM:
+        case KEY_CONFIRM:  /* 确认键 */
             if(g_pages[g_current_page_id].is_editable)
             {
-                /* 智能温控界面特殊处理 */
-                if(g_current_page_id == PAGE_PID_CONTROL)
+                /* 智能温控页面特殊处理 */
+                if(g_current_page_id == PAGE_SMART_CONTROL)
                 {
-                    Check_OK_Multiple_Press();
+                    /* 检查是否触发自整定 */
+                    Check_Autotune_Trigger();
                 }
                 else
                 {
-                    /* 普通编辑页面 */
+                    /* 普通页面进入编辑模式 */
                     g_current_mode = MODE_EDIT;
                     Send_UI_Message(MSG_MODE_CHANGE, g_current_page_id, 0, 0);
                 }
             }
             break;
             
-        case KEY_RETURN:
-            /* 浏览模式下ESC无操作 */
+        case KEY_RETURN:  /* ESC键 */
+            /* 浏览模式下无操作 */
             break;
     }
 }
@@ -70,21 +60,64 @@ void Process_Edit_Mode_Key(uint8_t key)
 {
     switch(key)
     {
-        case KEY_UP:
-        case KEY_DOWN:
-            Handle_Value_Adjustment(key);
+        case KEY_UP:  /* 增加数值 */
+            Handle_Value_Adjustment(KEY_UP);
             break;
             
-        case KEY_CONFIRM:
-            /* 编辑模式下OK无操作（数据已实时保存） */
+        case KEY_DOWN:  /* 减少数值 */
+            Handle_Value_Adjustment(KEY_DOWN);
             break;
             
-        case KEY_RETURN:
-            /* 退出编辑模式 */
+        case KEY_CONFIRM:  /* 确认键 */
+            /* 智能温控界面的特殊处理 */
+            if(g_current_page_id == PAGE_SMART_CONTROL)
+            {
+                Check_Autotune_Trigger();
+            }
+            break;
+            
+        case KEY_RETURN:  /* 退出编辑 */
             g_current_mode = MODE_BROWSE;
+            Reset_Key_Counter();  /* 退出时重置计数 */
             Send_UI_Message(MSG_MODE_CHANGE, g_current_page_id, 0, 0);
             break;
     }
+}
+
+/**
+ * @brief  处理自整定模式按键
+ */
+void Process_Autotune_Key(uint8_t key)
+{
+	switch(key)
+		{
+			case KEY_UP:
+			case KEY_DOWN:
+			case KEY_CONFIRM:
+				/* 自整定进行中，忽略这些按键 */
+				/* 可选：蜂鸣器提示操作无效 */
+				// HAL_GPIO_WritePin(BELL_GPIO_Port, BELL_Pin, GPIO_PIN_SET);
+				// osDelay(100);
+				// HAL_GPIO_WritePin(BELL_GPIO_Port, BELL_Pin, GPIO_PIN_RESET);
+				break;
+				
+			case KEY_RETURN:  /* 只有ESC键有效 */
+				/* 确认是否要停止自整定 */
+				Stop_Autotune();
+				g_current_mode = MODE_BROWSE;
+				g_current_page_id = PAGE_SMART_CONTROL;
+				g_key_counter.autotune_triggered = 0;
+				Reset_Key_Counter();
+				
+				/* 清除自整定状态 */
+				g_system_status.autotune_complete = 0;
+				g_system_status.mode = PID_MODE_RUN;
+				
+				/* 返回智能温控页面 */
+				Send_UI_Message(MSG_PAGE_CHANGE, PAGE_SMART_CONTROL, 0, 1);
+				break;
+		}
+
 }
 
 /**
@@ -94,44 +127,34 @@ void Handle_Page_Navigation(uint8_t key)
 {
     uint8_t old_page = g_current_page_id;
     
-    if(key == KEY_UP)
+    if(key == KEY_UP)  /* 前翻页 */
     {
-        /* 前翻页 */
         if(g_current_page_id > PAGE_TEMP_DISPLAY)
         {
             g_current_page_id--;
         }
         else if(g_current_page_id == PAGE_TEMP_DISPLAY)
         {
-            g_current_page_id = PAGE_STATUS_DISPLAY;  // 循环到最后页
+            g_current_page_id = PAGE_DIOXIN_DISPLAY;  /* 循环到最后页 */
         }
     }
-    else if(key == KEY_DOWN)
+    else if(key == KEY_DOWN)  /* 后翻页 */
     {
-        /* 后翻页 */
-        if(g_current_page_id < PAGE_STATUS_DISPLAY && 
+        if(g_current_page_id < PAGE_DIOXIN_DISPLAY && 
            g_current_page_id != PAGE_STARTUP)
         {
             g_current_page_id++;
         }
-        else if(g_current_page_id == PAGE_STATUS_DISPLAY)
+        else if(g_current_page_id == PAGE_DIOXIN_DISPLAY)
         {
-            g_current_page_id = PAGE_TEMP_DISPLAY;  // 循环到第一页
+            g_current_page_id = PAGE_TEMP_DISPLAY;  /* 循环到第一页 */
         }
     }
     
-    /* 跳过自整定进度页面（只能从PID控制页面进入） */
-    if(g_current_page_id == PAGE_AUTOTUNE_PROGRESS && 
-       g_system_status.mode != MODE_AUTOTUNE)
-    {
-        if(key == KEY_UP)
-            g_current_page_id--;
-        else
-            g_current_page_id++;
-    }
-    
+    /* 切换页面时重置OK键计数 */
     if(old_page != g_current_page_id)
     {
+        Reset_Key_Counter();
         Send_UI_Message(MSG_PAGE_CHANGE, g_current_page_id, 0, 1);
     }
 }
@@ -141,9 +164,8 @@ void Handle_Page_Navigation(uint8_t key)
  */
 void Handle_Value_Adjustment(uint8_t key)
 {
-    int16_t old_value, new_value;
-    
-    old_value = g_pages[g_current_page_id].current_value;
+    int16_t old_value = g_pages[g_current_page_id].current_value;
+    int16_t new_value = old_value;
     
     if(key == KEY_UP)
     {
@@ -151,7 +173,7 @@ void Handle_Value_Adjustment(uint8_t key)
         if(new_value > g_pages[g_current_page_id].max_value)
             new_value = g_pages[g_current_page_id].max_value;
     }
-    else  // KEY_DOWN
+    else if(key == KEY_DOWN)
     {
         new_value = old_value - g_pages[g_current_page_id].step;
         if(new_value < g_pages[g_current_page_id].min_value)
@@ -162,77 +184,75 @@ void Handle_Value_Adjustment(uint8_t key)
     {
         g_pages[g_current_page_id].current_value = new_value;
         
-        /* 保存设置值 */
-        Save_Temperature_Setting(g_current_page_id, new_value);
+        /* 保存参数到EEPROM */
+        if(g_current_page_id == PAGE_GUN_SETTING)
+        {
+            g_system_status.front_temp_sv = (float)new_value;
+            Check_And_Switch_Group();  /* 检查是否需要切换参数组 */
+        }
+        else if(g_current_page_id == PAGE_CAVITY_SETTING)
+        {
+            g_system_status.rear_temp_sv = (float)new_value;
+			Check_And_Switch_Group();  /* 检查是否需要切换参数组 */
+        }
         
-        /* 发送更新消息 */
         Send_UI_Message(MSG_VALUE_UPDATE, g_current_page_id, new_value, 0);
     }
 }
 
 /**
- * @brief  检测OK键多次连击
+ * @brief  检查是否触发自整定
  */
-void Check_OK_Multiple_Press(void)
+void Check_Autotune_Trigger(void)
 {
-    uint32_t current_tick = osKernelSysTick();
+    uint32_t current_time = osKernelSysTick();
     
-    /* 首次按下或超时重置 */
-    if(g_key_manager.ok_press_count == 0 || 
-       (current_tick - g_key_manager.ok_first_press_tick) > OK_KEY_TIMEOUT)
+    /* 超时重置（2秒内要按完7次） */
+    if((current_time - g_key_counter.last_press_time) > OK_KEY_TIMEOUT)
     {
-        g_key_manager.ok_press_count = 1;
-        g_key_manager.ok_first_press_tick = current_tick;
+        g_key_counter.ok_press_count = 0;
     }
-    else
+    
+    g_key_counter.ok_press_count++;
+    g_key_counter.last_press_time = current_time;
+    
+    /* 更新界面显示按键次数 */
+    Send_UI_Message(MSG_VALUE_UPDATE, PAGE_SMART_CONTROL, 
+                   g_key_counter.ok_press_count, 0);
+    
+    /* 检查是否达到触发条件 */
+    if(g_key_counter.ok_press_count >= OK_KEY_COUNT_MAX && !g_key_counter.autotune_triggered)
     {
-        g_key_manager.ok_press_count++;
+        /* 启动自整定 */
+        Start_Autotune();
+        g_current_mode = MODE_AUTOTUNE;
+        g_key_counter.autotune_triggered = 1;
         
-        /* 达到连击次数，触发自整定 */
-        if(g_key_manager.ok_press_count >= OK_KEY_COUNT_MAX)
-        {
-            g_key_manager.ok_press_count = 0;
-            
-            /* 启动自整定 */
-            Start_Autotune();
-            
-            /* 切换到自整定进度页面 */
-            g_current_page_id = PAGE_AUTOTUNE_PROGRESS;
-            Send_UI_Message(MSG_PAGE_CHANGE, PAGE_AUTOTUNE_PROGRESS, 0, 1);
-        }
+        /* 切换到进度显示界面 */
+        Send_UI_Message(MSG_MODE_CHANGE, PAGE_SMART_CONTROL, 0, 1);
     }
-    
-    /* 显示当前连击次数（可选） */
-    Send_UI_Message(MSG_VALUE_UPDATE, PAGE_PID_CONTROL, 
-                    g_key_manager.ok_press_count, 0);
 }
 
 /**
- * @brief  保存温度设置
+ * @brief  重置按键计数器
  */
-void Save_Temperature_Setting(uint8_t page_id, int16_t value)
+void Reset_Key_Counter(void)
 {
-    uint16_t eeprom_addr;
-    
-    switch(page_id)
-    {
-        case PAGE_GUN_SETTING:
-            eeprom_addr = EEPROM_GUN_TEMP_ADDR;
-            g_system_status.front_temp_sv = (float)value;
-            /* 检查是否需要切换PID参数组 */
-            Check_And_Switch_Group();
-            break;
-            
-        case PAGE_CAVITY_SETTING:
-            eeprom_addr = EEPROM_CAVITY_TEMP_ADDR;
-            g_system_status.rear_temp_sv = (float)value;
-            break;
-            
-        default:
-            return;
-    }
-    
-    /* 保存到EEPROM */
-    FM_WriteWordseq(eeprom_addr, &value, 1);
+    g_key_counter.ok_press_count = 0;
+    g_key_counter.last_press_time = 0;
 }
+
+/**
+ * @brief  发送UI消息
+ */
+void Send_UI_Message(MsgType_e type, uint8_t page_id, int16_t value, uint8_t refresh)
+{
+    UIMessage_t msg;
+    msg.msg_type = type;
+    msg.page_id = page_id;
+    msg.new_value = value;
+    msg.refresh_type = refresh;
+    xQueueSend(UI_Queue, &msg, 0);
+}
+
 

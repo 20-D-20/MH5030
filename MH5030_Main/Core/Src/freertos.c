@@ -122,8 +122,7 @@ void MX_FREERTOS_Init(void) {
 
   /* 初始化页面数据 */
    init_page_data();
-   Init_PID_Manager();  // 初始化PID管理器
-   Key_Manager_Init();  // 初始化按键管理器
+    
    /* 创建消息队列 */
    UI_Queue = xQueueCreate(10, sizeof(UIMessage_t));
    
@@ -195,7 +194,6 @@ void heaterctrl_task(void const * argument)
   /* USER CODE BEGIN StartDefaultTask */
     float pt100_front = 0;                                              /* 记录前枪管温度 */
     float pt100_rear = 0;                                               /* 记录腔体温度 */
-    uint8_t init_flag = 0;                                              /* 初始化标志 */
     
     /* 硬件初始化 */
     tps02r_iic_init(&g_stTps02r_IICManger);                            /* 初始化tps02r */
@@ -246,7 +244,7 @@ void heaterctrl_task(void const * argument)
         g_stPidRear.Sv = g_system_status.rear_temp_sv;
         
         /* 检查是否需要切换参数组 */
-        if (g_system_status.mode != MODE_AUTOTUNE)
+        if (g_system_status.mode != PID_MODE_AUTOTUNE)
         {
             Check_And_Switch_Group();
         }
@@ -261,7 +259,7 @@ void heaterctrl_task(void const * argument)
         }
         
         /* 根据运行模式执行不同逻辑 */
-        if (g_system_status.mode == MODE_AUTOTUNE)
+        if (g_system_status.mode == PID_MODE_AUTOTUNE)
         {
             /* 自整定模式：两路同时进行 */
             RelayFeedbackAutoTuning(&g_stPidFront, &g_stPidFrontAuto);
@@ -270,7 +268,7 @@ void heaterctrl_task(void const * argument)
             /* 检查自整定是否完成 */
             Check_Autotune_Complete();
         }
-        else if (g_system_status.mode == MODE_RUN)
+        else if (g_system_status.mode == PID_MODE_RUN)
         {
             /* 运行模式：执行PID控制 */
             PID_Calc(&g_stPidFront, &g_stPidFrontAuto);
@@ -313,13 +311,10 @@ void heaterctrl_task(void const * argument)
 void key_task(void const * argument)
 {
     uint8_t key = 0;
-    uint32_t startup_timer = 0;
+    uint32_t startup_timer = osKernelSysTick();
     
     /* 初始化按键管理器 */
     Key_Manager_Init();
-    
-    /* 启动页面显示计时 */
-    startup_timer = osKernelSysTick();
     
     for(;;)
     {
@@ -341,6 +336,7 @@ void key_task(void const * argument)
         {
             xSemaphoreTake(Data_Mutex, portMAX_DELAY);
             
+            /* 根据当前模式处理按键 */
             if(g_current_mode == MODE_BROWSE)
             {
                 Process_Browse_Mode_Key(key);
@@ -349,25 +345,47 @@ void key_task(void const * argument)
             {
                 Process_Edit_Mode_Key(key);
             }
+            else if(g_current_mode == MODE_AUTOTUNE)
+            {
+                Process_Autotune_Key(key);
+            }
             
             xSemaphoreGive(Data_Mutex);
+        }
+        
+        /* 自整定进度更新 */
+        if(g_current_mode == MODE_AUTOTUNE)
+        {
+            Update_System_Status();
+            
+            /* 检查是否完成 */
+            if(g_system_status.autotune_complete)
+            {
+                g_current_mode = MODE_BROWSE;
+                g_key_counter.autotune_triggered = 0;
+                Reset_Key_Counter();
+                Send_UI_Message(MSG_PAGE_CHANGE, PAGE_SMART_CONTROL, 0, 1);
+            }
+            else
+            {
+                /* 发送进度更新消息 */
+                Send_UI_Message(MSG_AUTOTUNE_PROGRESS, PAGE_SMART_CONTROL, 0, 0);
+            }
         }
         
         osDelay(20);
     }
 }
 
-/**
- * @brief  UI任务 - 处理显示更新
- */
+/* UI任务 */
 void ui_task(void const * argument)
 {
     UIMessage_t msg;
     uint32_t realtime_counter = 0;
+    bool need_temp_update = false;
     
-    /* 初始化OLED */
-    SSD1305_init();
-    clearscreen();
+    /* 初始化UI管理器 */
+    UI_Manager_Init();
     
     /* 显示启动页面 */
     Display_Startup_Page();
@@ -389,13 +407,23 @@ void ui_task(void const * argument)
                     break;
                     
                 case MSG_MODE_CHANGE:
-                    if(msg.page_id == PAGE_GUN_SETTING || 
-                       msg.page_id == PAGE_CAVITY_SETTING)
+                    if(msg.page_id == PAGE_SMART_CONTROL)
                     {
-                        bool highlight = (g_current_mode == MODE_EDIT);
+                        Display_Page(msg.page_id);
+                    }
+                    else
+                    {
                         Update_Value_Display(msg.page_id, 
-                                          g_pages[msg.page_id].current_value, 
-                                          highlight);
+                            g_pages[msg.page_id].current_value,
+                            g_current_mode == MODE_EDIT);
+                    }
+                    break;
+                    
+                case MSG_AUTOTUNE_PROGRESS:
+                    if(g_current_page_id == PAGE_SMART_CONTROL && 
+                       g_current_mode == MODE_AUTOTUNE)
+                    {
+                        Display_Autotune_Progress_Page();
                     }
                     break;
             }
@@ -403,18 +431,51 @@ void ui_task(void const * argument)
         
         /* 实时数据更新 */
         realtime_counter++;
-        if(realtime_counter >= 25)  // 500ms
+        if(realtime_counter >= 25)  /* 500ms */
         {
             realtime_counter = 0;
             
             xSemaphoreTake(Data_Mutex, portMAX_DELAY);
-            Update_Realtime_Data();
+            
+            /* 根据不同页面更新数据 */
+            if(g_current_page_id == PAGE_TEMP_DISPLAY && 
+               g_current_mode == MODE_BROWSE)
+            {
+                get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
+		   /* 温度显示页面 */
+                need_temp_update = true;
+            }
+            else if(g_current_page_id == PAGE_DIOXIN_DISPLAY && 
+                    g_current_mode == MODE_BROWSE)
+            {
+                /* 二噁英温度页面 */
+                get_dioxin_temperatures(&g_dioxin_temp1, &g_dioxin_temp2);
+                need_temp_update = true;
+            }
+            
             xSemaphoreGive(Data_Mutex);
+            
+            /* 刷新显示 */
+            if(need_temp_update)
+            {
+                if(g_current_page_id == PAGE_TEMP_DISPLAY)
+                {
+                    Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
+                    Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
+                }
+                else if(g_current_page_id == PAGE_DIOXIN_DISPLAY)
+                {
+                    Show_Word_U(14, 32, g_dioxin_temp1, 3, 0, false);
+                    Show_Word_U(78, 32, g_dioxin_temp2, 3, 0, false);
+                }
+                need_temp_update = false;
+            }
         }
         
         osDelay(20);
     }
 }
+
 
 /* USER CODE BEGIN Header_fan_task */
 /**

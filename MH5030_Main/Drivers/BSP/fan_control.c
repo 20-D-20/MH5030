@@ -42,13 +42,13 @@ FanStatus_t g_stFanStatus = {0};     /* 记录风扇运行状态 */
   */
 void Fan_Init(void)
 {
-    /* 初始化PWM输出 */                                                           /* TIM3_CH1 - PB4 */
+    /* 初始化PWM输出 */                                                          /* TIM3_CH1 - PB4 */
     Fan_PWM_Init();
     
-    /* 初始化转速检测 */                                                            /* FFG信号输入 */
+    /* 初始化转速检测 */                                                         /* FFG信号输入 */
     Fan_Capture_Init();
     
-    /* 设置默认参数 */                                                             /* 默认配置 */
+    /* 设置默认参数 */                                                           /* 默认配置 */
     fan.duty_cycle = 95;                                                         /* 默认85%占空比 */
     fan.enable = 0;                                                              /* 默认关闭 */
     
@@ -79,13 +79,13 @@ static void Fan_Capture_Init(void)
     /* 使能时钟 */                                                               /* GPIOA时钟 */
     __HAL_RCC_GPIOA_CLK_ENABLE();
     
-    /* 配置PA15为输入 (FFG信号) */                                                  /* 上升沿触发 */
+    /* 配置PA15为输入 (FFG信号) */                                               /* 上升沿触发 */
     GPIO_InitStruct.Pin = FFG_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(FFG_GPIO_Port, &GPIO_InitStruct);
     
-    /* 配置外部中断 */                                                             /* 优先级设置 */
+    /* 配置外部中断 */                                                           /* 优先级设置 */
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
@@ -189,7 +189,7 @@ static uint16_t Fan_CalculateRPM(uint32_t pulse_count, uint32_t period_ms)
 {
     if (period_ms == 0) return 0;
     
-    /* RPM = (脉冲数 * 60000) / (每转脉冲数 * 时间周期ms) */                              /* 转速计算公式 */
+    /* RPM = (脉冲数 * 60000) / (每转脉冲数 * 时间周期ms) */                      /* 转速计算公式 */
     uint32_t rpm = (pulse_count * 60000) / (FAN_PULSE_PER_REV * period_ms);
     
     return (uint16_t)rpm;
@@ -204,25 +204,25 @@ void Fan_Update(void)
 {
     uint32_t current_tick = HAL_GetTick();
     
-    /* 每隔固定时间更新转速 */                                                          /* 周期更新 */
+    /* 每隔固定时间更新转速 */                                                     /* 周期更新 */
     if (current_tick - fan.last_update_tick >= FAN_UPDATE_PERIOD) 
     {
         uint32_t period = current_tick - fan.last_update_tick;
         uint32_t pulses = fan.pulse_count - fan.last_pulse_count;
         
-        /* 计算并滤波转速值 */                                                        /* 中值滤波 */
+        /* 计算并滤波转速值 */                                                    /* 中值滤波 */
         fan.rpm = Filter_Median(Fan_CalculateRPM(pulses, period));
 
         /* 故障检测 */                                                            /* 转速过低判断 */
         if (fan.enable && fan.rpm < FAN_FAULT_THRESHOLD) 
         {
             fan.fault = 1;
-            g_stFanStatus.fault_consec++;                                     /* 连续故障计数 */
+            g_stFanStatus.fault_consec++;                                         /* 连续故障计数 */
         } 
         else 
         {
             fan.fault = 0;
-            g_stFanStatus.fault_consec = 0;                                   /* 清零计数 */
+            g_stFanStatus.fault_consec = 0;                                       /* 清零计数 */
         }       
         
         /* 更新计数 */                                                            /* 准备下次计算 */

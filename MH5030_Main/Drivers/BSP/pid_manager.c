@@ -346,7 +346,7 @@ void Start_Autotune(void)
 {
     /* 设置自整定标志 */
     g_system_status.autotune_request = 1;
-    g_system_status.mode = MODE_AUTOTUNE;
+    g_system_status.mode = PID_MODE_AUTOTUNE;
     
     /* 重置穿越计数 */
     g_system_status.front_cross_cnt = 0;
@@ -367,7 +367,7 @@ void Stop_Autotune(void)
 {
     /* 清除自整定标志 */
     g_system_status.autotune_request = 0;
-    g_system_status.mode = MODE_RUN;
+    g_system_status.mode = PID_MODE_RUN;
     
     /* 关闭自整定 */
     g_stPidFrontAuto.tuneEnable = 0;
@@ -416,7 +416,7 @@ void Save_Autotune_Results(void)
 void Update_System_Status(void)
 {
     /* 更新自整定状态 */
-    if (g_system_status.mode == MODE_AUTOTUNE)
+    if (g_system_status.mode == PID_MODE_AUTOTUNE)
     {
         Check_Autotune_Complete();
     }

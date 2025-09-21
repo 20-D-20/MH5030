@@ -23,9 +23,9 @@
 #define PARAM_GROUP_MAX     3               /* 最大组数 */
 
 /* 系统运行模式 */
-#define MODE_STOP           0               /* 停止模式 */
-#define MODE_RUN            1               /* 运行模式 */
-#define MODE_AUTOTUNE       2               /* 自整定模式 */
+#define PID_MODE_STOP       0                   /* 停止模式 */
+#define PID_MODE_RUN        1                   /* 运行模式 */
+#define PID_MODE_AUTOTUNE   2               /* 自整定模式 */
 
 /* 自整定完成标志 */
 #define AUTOTUNE_COMPLETE   5               /* 穿越5次完成 */
