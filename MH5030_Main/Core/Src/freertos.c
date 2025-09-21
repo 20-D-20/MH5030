@@ -44,6 +44,8 @@
 #include <stdlib.h>
 #include "pid_manager.h"
 #include "ui_manager.h"
+#include "key_manager.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -120,7 +122,8 @@ void MX_FREERTOS_Init(void) {
 
   /* 初始化页面数据 */
    init_page_data();
-   
+   Init_PID_Manager();  // 初始化PID管理器
+   Key_Manager_Init();  // 初始化按键管理器
    /* 创建消息队列 */
    UI_Queue = xQueueCreate(10, sizeof(UIMessage_t));
    
@@ -305,46 +308,34 @@ void heaterctrl_task(void const * argument)
 }
 
 /**
- * @brief      按键任务（页面/模式/参数编辑逻辑）
- * @param[in]  argument: 未使用
- * @retval     None
- * @note       行为：
- *             - 开机显示"启动页面"2秒后自动切换到"温度显示页面"
- *             - 浏览模式：UP/DOWN 翻页；CONFIRM 进入编辑
- *             - 编辑模式：UP/DOWN 按步进修改数值；RETURN 退出编辑
- *             - 收到事件后向 UI 任务发送消息（队列），并用互斥量保护共享数据
- *             - 周期：~20ms 扫描
+ * @brief  Key任务 - 处理按键和系统逻辑
  */
 void key_task(void const * argument)
 {
-    UIMessage_t msg;
     uint8_t key = 0;
-    uint8_t key_count = 0;
-    uint8_t last_key = 0;
     uint32_t startup_timer = 0;
-    int16_t old_value, new_value;
     
-    /* 启动页面显示计时 */                                                  /* 记录启动时间 */
+    /* 初始化按键管理器 */
+    Key_Manager_Init();
+    
+    /* 启动页面显示计时 */
     startup_timer = osKernelSysTick();
     
     for(;;)
     {
-        /* 自动切换启动页面 */                                              /* 2秒后自动切换 */
+        /* 自动切换启动页面 */
         if(g_current_page_id == PAGE_STARTUP && 
-           (osKernelSysTick() - startup_timer) > 2000)              /* 2秒后自动切换 */
+           (osKernelSysTick() - startup_timer) > 2000)
         {
             xSemaphoreTake(Data_Mutex, portMAX_DELAY);
             g_current_page_id = PAGE_TEMP_DISPLAY;
             xSemaphoreGive(Data_Mutex);
             
-            msg.msg_type = MSG_PAGE_CHANGE;
-            msg.page_id = PAGE_TEMP_DISPLAY;
-            msg.refresh_type = 1;                                   /* FULL_REFRESH */
-            xQueueSend(UI_Queue, &msg, 0);
+            Send_UI_Message(MSG_PAGE_CHANGE, PAGE_TEMP_DISPLAY, 0, 1);
         }
         
-        /* 按键扫描 */                                                  /* 检测按键输入 */
-        key = key_scan(0);                                          /* 不支持连按模式 */
+        /* 按键扫描 */
+        key = key_scan(0);
         
         if(key != 0)
         {
@@ -352,148 +343,34 @@ void key_task(void const * argument)
             
             if(g_current_mode == MODE_BROWSE)
             {
-                switch(key)
-                {
-                    case KEY_UP:                                    /* 前翻页 */
-                        if(g_current_page_id > PAGE_TEMP_DISPLAY)
-                        {
-                            g_current_page_id--;
-                        }
-                        else if(g_current_page_id == PAGE_TEMP_DISPLAY)
-                        {
-                            g_current_page_id = PAGE_CAVITY_SETTING; /* 循环到最后页 */
-                        }
-                        
-                        msg.msg_type = MSG_PAGE_CHANGE;
-                        msg.page_id = g_current_page_id;
-                        msg.refresh_type = 1;
-                        xQueueSend(UI_Queue, &msg, 0);
-                        break;
-                    
-                    case KEY_DOWN:                                  /* 后翻页 */
-                        if(g_current_page_id < PAGE_CAVITY_SETTING && 
-                           g_current_page_id != PAGE_STARTUP)
-                        {
-                            g_current_page_id++;
-                        }
-                        else if(g_current_page_id == PAGE_CAVITY_SETTING)
-                        {
-                            g_current_page_id = PAGE_TEMP_DISPLAY;   /* 循环到第一页 */
-                        }
-                        
-                        msg.msg_type = MSG_PAGE_CHANGE;
-                        msg.page_id = g_current_page_id;
-                        msg.refresh_type = 1;
-                        xQueueSend(UI_Queue, &msg, 0);
-                        break;
-                    
-                    case KEY_CONFIRM:                               /* 确认键 - 进入编辑模式 */
-                        if(g_pages[g_current_page_id].is_editable)
-                        {
-                            g_current_mode = MODE_EDIT;
-                            msg.msg_type = MSG_MODE_CHANGE;
-                            msg.page_id = g_current_page_id;
-                            msg.refresh_type = 0;                   /* VALUE_ONLY */
-                            xQueueSend(UI_Queue, &msg, 0);
-                        }
-                        break;
-                    
-                    case KEY_RETURN:                                /* ESC键在浏览模式下无操作 */
-                        break;
-                }
+                Process_Browse_Mode_Key(key);
             }
             else if(g_current_mode == MODE_EDIT)
             {
-                switch(key)
-                {
-                    case KEY_UP:                                    /* 增加数值 */
-                        old_value = g_pages[g_current_page_id].current_value;
-                        new_value = old_value + g_pages[g_current_page_id].step;
-                        
-                        if(new_value > g_pages[g_current_page_id].max_value)
-                            new_value = g_pages[g_current_page_id].max_value;
-                        
-                        if(new_value != old_value)
-                        {
-                            g_pages[g_current_page_id].current_value = new_value;
-                            
-                            /* TODO: 这里添加保存参数的代码 */        /* 参数保存功能 */
-                            /* save_parameter(g_current_page_id, new_value); */
-                            
-                            msg.msg_type = MSG_VALUE_UPDATE;
-                            msg.page_id = g_current_page_id;
-                            msg.new_value = new_value;
-                            msg.refresh_type = 0;
-                            xQueueSend(UI_Queue, &msg, 0);
-                        }
-                        break;
-                    
-                    case KEY_DOWN:                                  /* 减小数值 */
-                        old_value = g_pages[g_current_page_id].current_value;
-                        new_value = old_value - g_pages[g_current_page_id].step;
-                        
-                        if(new_value < g_pages[g_current_page_id].min_value)
-                            new_value = g_pages[g_current_page_id].min_value;
-                        
-                        if(new_value != old_value)
-                        {
-                            g_pages[g_current_page_id].current_value = new_value;
-                            
-                            /* TODO: 这里添加保存参数的代码 */        /* 参数保存功能 */
-                            /* save_parameter(g_current_page_id, new_value); */
-                            
-                            msg.msg_type = MSG_VALUE_UPDATE;
-                            msg.page_id = g_current_page_id;
-                            msg.new_value = new_value;
-                            msg.refresh_type = 0;
-                            xQueueSend(UI_Queue, &msg, 0);
-                        }
-                        break;
-                    
-                    case KEY_CONFIRM:                               /* 确认键在编辑模式下无操作 */
-                        break;
-                    
-                    case KEY_RETURN:                                /* 退出编辑模式 */
-                        g_current_mode = MODE_BROWSE;
-                        msg.msg_type = MSG_MODE_CHANGE;
-                        msg.page_id = g_current_page_id;
-                        msg.refresh_type = 0;
-                        xQueueSend(UI_Queue, &msg, 0);
-                        break;
-                }
+                Process_Edit_Mode_Key(key);
             }
             
             xSemaphoreGive(Data_Mutex);
         }
         
-        osDelay(20);                                                /* 20ms扫描周期 */
+        osDelay(20);
     }
 }
 
 /**
- * @brief  UI 任务（OLED 页面渲染与实时刷新）
- * @param  argument  未使用
- * @retval None
- *
- * 行为：
- * - 初始化 OLED，显示启动画面
- * - 处理队列消息：页面切换、数值局刷、模式切换
- * - 在温度显示页每 500ms 更新一次测量值
- * - 周期：~20ms 刷新
+ * @brief  UI任务 - 处理显示更新
  */
 void ui_task(void const * argument)
 {
     UIMessage_t msg;
     uint32_t realtime_counter = 0;
-    bool need_temp_update = false;
     
     /* 初始化OLED */
     SSD1305_init();
     clearscreen();
     
     /* 显示启动页面 */
-    DispString(40, 12, "MH5030", false);
-    DispString(28, 36, "Ver 1.0.0", false);
+    Display_Startup_Page();
     
     for(;;)
     {
@@ -503,115 +380,39 @@ void ui_task(void const * argument)
             switch(msg.msg_type)
             {
                 case MSG_PAGE_CHANGE:
-                    /* 页面切换 - 全刷新 */
-                    clearscreen();
+                    Display_Page(msg.page_id);
+                    break;
                     
-                    switch(msg.page_id)
-                    {
-                        case PAGE_TEMP_DISPLAY:
-                            /* 温度显示界面 */
-                            DispString12(30, 0, "测量值", false);
-                            DispString12(80, 0, "设定值", false);
-                            DispString12(0, 24, "枪管", false);
-                            DispString12(0, 48, "腔体", false);
-                            draw_hline(1, 127, 16);
-                            draw_rect(0,0,20,15,1);
-                        
-                            /* 显示测量值 */
-                            get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
-                            Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
-                            Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
-                            
-                            /* 显示设定值 */
-                            Disp_Word_UM(88, 24, 3, g_pages[PAGE_GUN_SETTING].current_value, 0, 0);
-                            Disp_Word_UM(88, 48, 3, g_pages[PAGE_CAVITY_SETTING].current_value, 0, 0);
-                            break;
-                        
-                        case PAGE_GUN_SETTING:
-                            /* 枪管温度设置界面 */
-                            DispString(16, 0, "枪管温度设置", false);
-                            draw_hline(1, 127, 20);
-                            Show_Word_U(48, 32, g_pages[PAGE_GUN_SETTING].current_value, 3, 0, false);
-                            DispString(74, 32, "℃", false);
-                            break;
-                        
-                        case PAGE_CAVITY_SETTING:
-                            /* 腔体温度设置界面 */
-                            DispString(16, 0, "腔体温度设置", false);
-                            draw_hline(1, 127, 20);
-                            Show_Word_U(48, 32, g_pages[PAGE_CAVITY_SETTING].current_value, 3, 0, false);
-                            DispString(74, 32, "℃", false);
-                            break;
-                    }
-                    break;
-                
                 case MSG_VALUE_UPDATE:
-                    /* 数值更新 - 局部刷新 */
-                    if(msg.page_id == PAGE_GUN_SETTING)
-                    {
-                        Show_Word_U(48, 32, msg.new_value, 3, 0, g_current_mode == MODE_EDIT);
-                    }
-                    else if(msg.page_id == PAGE_CAVITY_SETTING)
-                    {
-                        Show_Word_U(48, 32, msg.new_value, 3, 0, g_current_mode == MODE_EDIT);
-                    }
+                    Update_Value_Display(msg.page_id, msg.new_value, 
+                                       g_current_mode == MODE_EDIT);
                     break;
-                
+                    
                 case MSG_MODE_CHANGE:
-                    /* 模式切换 */
-                    if(g_current_mode == MODE_EDIT)
+                    if(msg.page_id == PAGE_GUN_SETTING || 
+                       msg.page_id == PAGE_CAVITY_SETTING)
                     {
-                        /* 进入编辑模式 - 数值反显 */
-                        if(msg.page_id == PAGE_GUN_SETTING)
-                        {
-                            Show_Word_U(48, 32, g_pages[PAGE_GUN_SETTING].current_value, 3, 0, true);
-                        }
-                        else if(msg.page_id == PAGE_CAVITY_SETTING)
-                        {
-                            Show_Word_U(48, 32, g_pages[PAGE_CAVITY_SETTING].current_value, 3, 0, true);
-                        }
-                    }
-                    else
-                    {
-                        /* 退出编辑模式 - 正常显示 */
-                        if(msg.page_id == PAGE_GUN_SETTING)
-                        {
-                            Show_Word_U(48, 32, g_pages[PAGE_GUN_SETTING].current_value, 3, 0, false);
-                        }
-                        else if(msg.page_id == PAGE_CAVITY_SETTING)
-                        {
-                            Show_Word_U(48, 32, g_pages[PAGE_CAVITY_SETTING].current_value, 3, 0, false);
-                        }
+                        bool highlight = (g_current_mode == MODE_EDIT);
+                        Update_Value_Display(msg.page_id, 
+                                          g_pages[msg.page_id].current_value, 
+                                          highlight);
                     }
                     break;
             }
         }
         
-        /* 实时数据更新（仅在温度显示页面） */
+        /* 实时数据更新 */
         realtime_counter++;
-        if(realtime_counter >= 25)  // 25*20ms = 500ms
+        if(realtime_counter >= 25)  // 500ms
         {
             realtime_counter = 0;
             
             xSemaphoreTake(Data_Mutex, portMAX_DELAY);
-            if(g_current_page_id == PAGE_TEMP_DISPLAY && g_current_mode == MODE_BROWSE)
-            {
-                /* 更新温度测量值 */
-                get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
-                need_temp_update = true;
-            }
+            Update_Realtime_Data();
             xSemaphoreGive(Data_Mutex);
-            
-            if(need_temp_update)
-            {
-                /* 刷新显示 */
-                Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
-                Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
-                need_temp_update = false;
-            }
         }
         
-        osDelay(20);  // 20ms刷新周期
+        osDelay(20);
     }
 }
 

@@ -183,8 +183,8 @@ int main(void)
 
   
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
-//  SSD1305_init();                                       
-//  clearscreen();
+  SSD1305_init();                                       
+  clearscreen();
 //  
 //             /* 起始界面 */
 //  DispString(40, 12, "MH5030",   false);
@@ -241,15 +241,65 @@ int main(void)
 //    
 /*************************************************/  
 
+//          /* 二噁英，3091，温度显示界面 */
+//    dispHzChar(24,0,35,false);        /* 噁 */
+//    DispString(8, 0, "二", false);
+//    DispString(40, 0, "英", false);
+//    DispString(80, 0, "3091", false);
+
+//              /* 分割线 */
+//    draw_hline(1,127,18);
+//    draw_vspan(64,1,64);
+
+////    DispString12(12, 24, "测量值", false);
+////    DispString12(76, 24, "测量值", false);
+
+////    //    /* 6*12 显示*/
+////    Disp_Word_UM(18, 40, 3, 120, 0, 0);
+////    DispString12(40, 40, "℃", false);
+////    Disp_Word_UM(82, 40, 3, 120, 0, 0);
+//    
+//    ////    /* 8*16 显示*/
+//    Show_Word_U(14, 32, 101, 3, 0, false);
+//    DispString(38, 32, "℃", false);
+//    Show_Word_U(78, 32, 101, 3, 0, false);
+//    DispString(102, 32, "℃", false);
+
+/*************************************************/  
+
+//          /* 智能温控调节界面 */
+//    DispString(16, 0, "智能温控调节", false);
+//              /* 分割线 */
+//      draw_hline(1,127,20);
+
+//    DispString(32, 32, "已按:", false);
+//    Show_Word_U(72, 32, 1, 1, 0, true);
+//    DispString(80, 32, "/", false);
+//    Show_Word_U(88, 32, 7, 1, 0, false);
+    
+///*************************************************/  
+
+          /* 智能温控调节进度界面 */
+    DispString(16, 0, "智能温控调节", false);
+              /* 分割线 */
+      draw_hline(1,127,20);
+
+    DispString(32, 32, "进度:", false);
+    Show_Word_U(72, 32, 1, 1, 0, true);
+    DispString(80, 32, "/", false);
+    Show_Word_U(88, 32, 5, 1, 0, false);
+    
+///*************************************************/  
+
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
 
   /* USER CODE END 2 */
 
-  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+//  /* Call init function for freertos objects (in cmsis_os2.c) */
+//  MX_FREERTOS_Init();
 
-  /* Start scheduler */
-  osKernelStart();
+//  /* Start scheduler */
+//  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 

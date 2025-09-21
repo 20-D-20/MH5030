@@ -39,6 +39,7 @@ void Full_on(void);
 void Set_Addr(u8 page, u8 col);
 void clearscreen(void);
 void Show_pic(u8 page, u8 a, u8 b);
+void dispHzChar(u8 x, u8 y, u16 gb_code, bool fb);
 void dispHzChar12(u8 x, u8 y, u16 gb_code, bool fb);
 u16 searchIndex12(const u8 da[2]);
 void Disp_Char_6x12(u8 x, u8 y, u8 asc_code, bool fb);

@@ -733,9 +733,14 @@
               <FilePath>..\Drivers\BSP\ui_manager.c</FilePath>
             </File>
             <File>
-              <FileName>ui_manager.h</FileName>
+              <FileName>key_manager.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Drivers\BSP\ui_manager.h</FilePath>
+              <FilePath>..\Drivers\BSP\key_manager.h</FilePath>
+            </File>
+            <File>
+              <FileName>key_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\BSP\key_manager.c</FilePath>
             </File>
           </Files>
         </Group>
