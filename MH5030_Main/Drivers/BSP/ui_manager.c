@@ -2,6 +2,7 @@
 #include "key_manager.h"
 
 /* 全局变量 */
+uint8_t g_current_gun_id = POLL_H2SO4_MIST;
 SystemMode_e g_current_mode = MODE_BROWSE;
 uint8_t g_current_page_id = PAGE_STARTUP;
 PageData_t g_pages[PAGE_MAX];
@@ -32,34 +33,40 @@ void init_page_data(void)
     
     /* 温度显示页面 */
     g_pages[PAGE_TEMP_DISPLAY].page_id = PAGE_TEMP_DISPLAY;
-    g_pages[PAGE_TEMP_DISPLAY].is_editable = false;
-    g_pages[PAGE_TEMP_DISPLAY].current_value = 0;
+    g_pages[PAGE_TEMP_DISPLAY].is_editable = false;            /* 可进入编辑模式 */
+    g_pages[PAGE_TEMP_DISPLAY].current_value = 0;              /* 用于存储按键次数 */
+
+    /* 枪管选择页面 */
+    g_pages[PAGE_GUN_SELECT].page_id = PAGE_GUN_SELECT;
+    g_pages[PAGE_GUN_SELECT].is_editable = true;               /* 可进入编辑模式 */
+    g_pages[PAGE_GUN_SELECT].current_value = 0;                /* 用于存储按键次数 */
     
     /* 枪管温度设置 */
     g_pages[PAGE_GUN_SETTING].page_id = PAGE_GUN_SETTING;
     g_pages[PAGE_GUN_SETTING].is_editable = true;
-    g_pages[PAGE_GUN_SETTING].current_value = 101;
-    g_pages[PAGE_GUN_SETTING].min_value = 50;
-    g_pages[PAGE_GUN_SETTING].max_value = 250;
-    g_pages[PAGE_GUN_SETTING].step = 5;
+    g_pages[PAGE_GUN_SETTING].current_value = 101;             /* 初始设定值 */
+    g_pages[PAGE_GUN_SETTING].min_value = 0;
+    g_pages[PAGE_GUN_SETTING].max_value = 240;
+    g_pages[PAGE_GUN_SETTING].step = 5;                        /* 温度设置步进 */ 
     
     /* 腔体温度设置 */
     g_pages[PAGE_CAVITY_SETTING].page_id = PAGE_CAVITY_SETTING;
     g_pages[PAGE_CAVITY_SETTING].is_editable = true;
-    g_pages[PAGE_CAVITY_SETTING].current_value = 120;
-    g_pages[PAGE_CAVITY_SETTING].min_value = 50;
-    g_pages[PAGE_CAVITY_SETTING].max_value = 250;
-    g_pages[PAGE_CAVITY_SETTING].step = 5;
+    g_pages[PAGE_CAVITY_SETTING].current_value = 120;          /* 初始设定值 */
+    g_pages[PAGE_CAVITY_SETTING].min_value = 0;
+    g_pages[PAGE_CAVITY_SETTING].max_value = 240;
+    g_pages[PAGE_CAVITY_SETTING].step = 5;                     /* 温度设置步进 */ 
     
     /* 智能温控调节 */
     g_pages[PAGE_SMART_CONTROL].page_id = PAGE_SMART_CONTROL;
-    g_pages[PAGE_SMART_CONTROL].is_editable = true;  /* 可进入编辑模式 */
-    g_pages[PAGE_SMART_CONTROL].current_value = 0;   /* 用于存储按键次数 */
+    g_pages[PAGE_SMART_CONTROL].is_editable = true;            /* 可进入编辑模式 */
+    g_pages[PAGE_SMART_CONTROL].current_value = 0;             /* 用于存储按键次数 */
     
     /* 二噁英显示页面 */
     g_pages[PAGE_DIOXIN_DISPLAY].page_id = PAGE_DIOXIN_DISPLAY;
     g_pages[PAGE_DIOXIN_DISPLAY].is_editable = false;
     g_pages[PAGE_DIOXIN_DISPLAY].current_value = 0;
+  
 }
 
 /**
@@ -97,6 +104,11 @@ void Display_Page(uint8_t page_id)
         case PAGE_DIOXIN_DISPLAY:
             Display_Dioxin_Page();
             break;
+        
+        case PAGE_GUN_SELECT:
+            Display_Gun_Select_Page();
+            break;
+
     }
 }
 
@@ -114,24 +126,52 @@ void Display_Startup_Page(void)
  */
 void Display_Temp_Page(void)
 {
-    DispString12(30, 0, "测量值", false);
-    DispString12(80, 0, "设定值", false);
-    DispString12(0, 24, "枪管", false);
-    DispString12(0, 48, "腔体", false);
-    draw_hline(1, 127, 16);
+    DispString(8, 0, "枪管℃", false);
+    DispString(72, 0, "腔体℃", false);
     
-    /* 显示测量值 */
-    get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
-    Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
-    Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
-    
-    /* 显示设定值 */
-    Disp_Word_UM(88, 24, 3, g_pages[PAGE_GUN_SETTING].current_value, 0, 0);
-    Disp_Word_UM(88, 48, 3, g_pages[PAGE_CAVITY_SETTING].current_value, 0, 0);
+     /* 分割线 */
+    draw_vspan(64,1,64);
+    draw_hline(1,123,18);
+        
+//    /* 显示测量值 */
+//    get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
+//    Show_Word_U_16x32(8,24,g_gun_temp_measured,3,0,false);
+//    Show_Word_U_16x32(70,24,g_cavity_temp_measured,3,0,false);
+
+    Show_Word_U_16x32(8,24,(u16)g_system_status.front_temp_pv,3,0,false);
+    Show_Word_U_16x32(70,24,(u16)g_system_status.rear_temp_pv,3,0,false);
 }
 
 /**
- * @brief  显示枪管设置页面
+ * @brief  枪管选择页面
+ */
+void Display_Gun_Select_Page(void)
+{
+     /* 枪管选择界面 */
+    DispString(32, 0, "枪管设置", false);
+    
+    /* 分割线 */
+    draw_hline(1,127,20);
+
+    DispString(14, 24, "硫酸雾", g_current_gun_id == POLL_H2SO4_MIST);
+    DispString(68, 24, "二噁英", g_current_gun_id == POLL_DIOXIN);
+    dispHzChar(84,24,31,g_current_gun_id == POLL_DIOXIN);        /* 噁 */
+    
+    /* 分割线 */
+    draw_hline(13,115,44);
+    draw_vspan(64,21,43);
+    draw_vspan(45,45,64);
+    draw_vspan(84,45,64);
+    
+    DispString(22,48,"汞", g_current_gun_id == POLL_AMMONIA);
+    DispString(50,48,"3041", g_current_gun_id == POLL_CODE_3091);
+    DispString(90,48,"氨", g_current_gun_id == POLL_MERCURY);
+
+}
+
+
+/**
+ * @brief  显示枪管温度设置页面
  */
 void Display_Gun_Setting_Page(void)
 {
@@ -195,16 +235,8 @@ void Display_Autotune_Progress_Page(void)
     DispString(80, 32, "/", false);
     Show_Word_U(88, 32, 5, 1, 0, false);
     
-    /* 显示提示信息 */
-    DispString(16, 48, "ESC键停止", false);
-    
-//    /* 可选：显示进度条 */
-//    uint8_t bar_width = (progress * 100) / 5;  // 转换为百分比宽度
-//    draw_rect(14, 56, 100, 6, false);          // 外框
-//    if(bar_width > 0)
-//    {
-//        draw_rect(14, 56, bar_width, 6, true); // 填充进度
-//    }
+//    /* 显示提示信息 */
+//    DispString(16, 48, "ESC键停止", false);
 
 }
 
@@ -214,7 +246,7 @@ void Display_Autotune_Progress_Page(void)
 void Display_Dioxin_Page(void)
 {
     /* 显示标题 */
-    dispHzChar(24, 0, 35, false);  /* 噁 */
+    dispHzChar(24, 0, 33, false);  /* 噁 */
     DispString(8, 0, "二", false);
     DispString(40, 0, "英", false);
     DispString(80, 0, "3091", false);

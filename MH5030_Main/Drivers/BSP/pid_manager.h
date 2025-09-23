@@ -83,6 +83,7 @@ typedef struct
 } System_Status_t;
 
 /* ---------------------- 全局变量声明 ---------------------- */
+
 extern System_Status_t g_system_status;   /* 全局系统状态 */
 extern PID_Storage_t g_pid_storage;       /* PID存储结构 */
 

@@ -121,16 +121,16 @@ int main(void)
 
 //  HAL_TIM_PWM_Start (&htim3, TIM_CHANNEL_1);
 //  HAL_GPIO_WritePin (GPIOB,GPIO_PIN_3,GPIO_PIN_RESET);
-  Fan_Init();
-  Fan_Start();
-  Filter_Init_All();
-//  Filter_Test();
+    Fan_Init();
+    Fan_Start();
+    Filter_Init_All();
+  
 /*-------------------------------------FAN TEST PROGRAM----------------------------------------------*/
   
 /*-------------------------------------PWM TEST PROGRAM----------------------------------------------*/
 
-//  HAL_TIM_PWM_Start (&htim1, TIM_CHANNEL_2);
-//  HAL_TIM_PWM_Start (&htim4, TIM_CHANNEL_4);
+  HAL_TIM_PWM_Start (&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start (&htim4, TIM_CHANNEL_4);
 
 /*-------------------------------------PWM TEST PROGRAM----------------------------------------------*/
 
@@ -157,16 +157,17 @@ int main(void)
 
 
 /*-------------------------------------TPS02R test program----------------------------------------------*/
-//  u8 error = 0;                                                             
-//  tps02r_iic_init(&g_stTps02r_IICManger);                                        
-//  error=tps02r_cfg_init();
-//  if(error==0)
-//  {
+//    u8 error = 0;                                                             
+//    tps02r_iic_init(&g_stTps02r_IICManger);                                        
+//    error=tps02r_cfg_init();
+//    if(error==0)
+//    {
 //      printf("ok!!!\n");
-//  }else
-//  {
+//    }else
+//    {
 //      printf("error!!!\n");
-//  }
+//    }
+
 /*-------------------------------------TPS02R test program----------------------------------------------*/
   
   
@@ -183,38 +184,25 @@ int main(void)
 
   
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
-  SSD1305_init();                                       
-  clearscreen();
+//  SSD1305_init();                                       
+//  clearscreen();
 //  
 //             /* 起始界面 */
 //  DispString(40, 12, "MH5030",   false);
 //  DispString(28, 36, "Ver 1.0.0", false);
 /*************************************************/  
-
 //        /* 枪管，腔体 温度显示界面 */
-//   
-//    DispString12(30, 0, "测量值", false);
-//    DispString12(80, 0 ,"设定值", false);
+   
+//    DispString(8, 0, "枪管℃", false);
+//    DispString(72, 0, "腔体℃", false);
 //    
-//    DispString12(0, 24, "枪管", false);
-//    DispString12(0, 48, "腔体", false);
+//     /* 分割线 */
+//    draw_vspan(64,1,64);
+//    draw_hline(1,123,18);
+//     
+//    Show_Word_U_16x32(8,24,978,3,0,false);
+//    Show_Word_U_16x32(72,24,978,3,0,false);
 
-//    /* 分割线 */
-//    draw_hline(1, 127,16);
-
-//    draw_rect(0,0,20,15,1);
-//    /* 6*12 显示*/
-//    Disp_Word_UM(38, 24, 3, 120, 0, 0);
-//    Disp_Word_UM(38, 48, 3, 120, 0, 0);
-
-////    /* 8*16 显示*/
-////    Show_Word_U(36, 24, 101, 3, 0, false);
-////    DispString(60, 24, "℃", false);
-////    Show_Word_U(36, 48, 101, 3, 0, false);
-////    DispString(60, 48, "℃", false);
-//    
-//    Disp_Word_UM(88, 24, 3, 120, 0, 0);
-//    Disp_Word_UM(88, 48, 3, 120, 0, 0);
 /*************************************************/  
     
 //          /* 枪管温度设置界面 */
@@ -279,40 +267,74 @@ int main(void)
 //    
 /////*************************************************/  
 
-//          /* 智能温控调节进度界面 */
+//    /* 显示标题 */
 //    DispString(16, 0, "智能温控调节", false);
-//              /* 分割线 */
-//      draw_hline(1,127,20);
-
+//    draw_hline(1, 127, 20);
+//    
+//    /* 显示进度 */
 //    DispString(32, 32, "进度:", false);
 //    Show_Word_U(72, 32, 1, 1, 0, true);
 //    DispString(80, 32, "/", false);
 //    Show_Word_U(88, 32, 5, 1, 0, false);
     
+//    /* 显示提示信息 */
+//    DispString(16, 48, "ESC键停止", false);
+///*************************************************/  
+    
+//     /* 枪管选择界面 */
+//    DispString(32, 0, "枪管设置", false);
+//    
+//    /* 分割线 */
+//    draw_hline(1,127,20);
+//    
+//    DispString(14, 24, "硫酸雾", true);
+//    DispString(68, 24, "二噁英", false);
+//    dispHzChar(84,24,31,false);        /* 噁 */
+//    
+//    /* 分割线 */
+//    draw_hline(13,115,44);
+//    draw_vspan(64,21,43);
+//    draw_vspan(45,45,64);
+//    draw_vspan(84,45,64);
+//    
+//    DispString(22,48,"汞", false);
+//    DispString(50,48,"3041", true);
+//    DispString(90,48,"氨", false);
+
 ///*************************************************/  
 
 /*-------------------------------------SSD1305 test program----------------------------------------------*/
 
   /* USER CODE END 2 */
 
-  /* Call init function for freertos objects (in cmsis_os2.c) */
-  MX_FREERTOS_Init();
+    /* Call init function for freertos objects (in cmsis_os2.c) */
+    MX_FREERTOS_Init();
 
-  /* Start scheduler */
-  osKernelStart();
+    /* Start scheduler */
+    osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-  while (1)
-  {
-
+    
+    float pt100_1 = 0.0;
+    float pt100_2 = 0.0;
+    filter_init(&g_stFilterFront, /*N=*/10, /*MEDIAN_N=*/5, /*limit_step=*/0.5f);    /* 滤波器参数配置 */
+    filter_init(&g_stFilterRear, /*N=*/10, /*MEDIAN_N=*/5, /*limit_step=*/0.5f);    /* 滤波器参数配置 */
+    
+while (1)
+{
+    tps02r_get_temp(TPS02R_CHAN1,&pt100_1);
+    tps02r_get_temp(TPS02R_CHAN2,&pt100_2);
+    printf("Pt100_1 = %5.3f,Pt100_2 = %5.3f\n",pt100_1,pt100_2);
+    printf("Pt100_1_filter = %5.3f,Pt100_2_filter = %5.3f\n"
+            ,combined_filter(&g_stFilterFront,pt100_1),combined_filter(&g_stFilterRear,pt100_2));
+    delay_ms(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+}
   /* USER CODE END 3 */
 }
 

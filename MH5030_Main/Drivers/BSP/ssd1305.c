@@ -34,7 +34,7 @@ void spi_write(u8 data)
  */
 void Write_Cmd(u8 cmd)
 {
-   delay_us(1);                                                         /* 时序余量 */
+   delay_us(1);                                                      /* 时序余量 */
     CS_1305_CLR;                                                     /* 片选使能 */
 
    delay_us(1);
@@ -57,7 +57,7 @@ void Write_Cmd(u8 cmd)
  */
 void Write_Data(u8 data)
 {
-   delay_us(1);                                                         /* 时序余量 */
+   delay_us(1);                                                      /* 时序余量 */
     CS_1305_CLR;                                                     /* 片选使能 */
 
    delay_us(1);
@@ -117,7 +117,7 @@ void clearscreen(void)
         for (j = 0; j < MAX_COL; j++)                              /* 遍历该页所有列 */
             Write_Data(0x00);                                      /* 写 0 清空像素 */
     }
-    delay_ms(10);                                                 /* 适当延时，等待硬件稳定（单位依平台实现而定） */
+    delay_ms(10);                                                  /* 适当延时，等待硬件稳定（单位依平台实现而定） */
 }
 
 /*
@@ -287,14 +287,17 @@ void Disp_Char_6x12(u8 x, u8 y, u8 asc_code, bool fb)
     if (x + 6 > MAX_COL || y + 12 > MAX_ROW) return;
     
     // 根据ASCII码确定在asc_M数组中的索引
-    if (asc_code >= '0' && asc_code <= '9') {
+    if (asc_code >= '0' && asc_code <= '9')
+    {
         if (asc_code == '0')
             index = 9;  // '0'在数组的第9位
         else
             index = asc_code - '1';  // '1'~'9'对应0~8
     }
-    else {
-        switch(asc_code) {
+    else 
+    {
+        switch(asc_code) 
+        {
             case '+':
                 index = 10;
                 break;
@@ -331,13 +334,15 @@ void Disp_Char_6x12(u8 x, u8 y, u8 asc_code, bool fb)
     // 6x12字体需要2页显示
     // 前6字节是上半部分（8行）
     Set_Addr(y >> 3, x);
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 6; i++) 
+    {
         Write_Data(pcode[i] ^ mask);
     }
     
     // 后6字节是下半部分（4行）
     Set_Addr((y >> 3) + 1, x);
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 6; i++) 
+    {
         Write_Data(pcode[i + 6] ^ mask);
     }
 }
@@ -482,6 +487,118 @@ void DispString(u8 x, u8 y, const char* str, bool Fb)
         }
     }
 }
+
+static const u8 kDigitIndexMap[10] = { 9, 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+
+/**
+ * @brief      显示 16x32 数字字符
+ * @param[in]  x:      列起始位置
+ * @param[in]  y:      行起始像素
+ * @param[in]  digit:  数字 (0-9)
+ * @param[in]  invert: 反色标志
+ * @retval     None
+ */
+void Disp_Digit_16x32(u8 x, u8 y, u8 digit, bool invert)
+{
+    u8 page, col;
+    const u8 *p;
+
+    if (digit > 9) return;
+    if (x + 16 > MAX_COL || y + 32 > MAX_ROW) return;             /* 边界保护（16×32） */
+
+    /* 每个 16×32 字符占 64 字节：按 "4 页 × 每页 16 列" 顺序排列 */ /* 字模结构说明 */
+    p = asc_16x32[kDigitIndexMap[digit]].Msk;
+
+    for (page = 0; page < 4; page++) 
+        {
+        Set_Addr((y >> 3) + page, x);
+        for (col = 0; col < 16; col++) 
+        {
+            u8 b = *p++;
+            Write_Data(invert ? (b ^ 0xFF) : b);
+        }
+    }
+}
+
+/**
+ * @brief      绘制 16x32 风格的小数点（占 2 列）
+ * @param[in]  x:      列起始位置
+ * @param[in]  y:      行起始像素
+ * @param[in]  invert: 反色标志
+ * @retval     None
+ * @note       在字符底部两行点亮
+ */
+static void draw_dot_16x32(u8 x, u8 y, bool invert)
+{
+    u8 maskTop = invert ? 0xFF : 0x00;
+    u8 maskDot = invert ? (0xFF ^ 0x03) : 0x03;                   /* 仅最低两位点亮 */
+
+    /* 前三页都写空（保持背景），最后一页底部点亮两行 */             /* 小数点绘制策略 */
+    /* 第 0~2 页 */                                                 /* 前三页处理 */
+    for (u8 page = 0; page < 3; page++) 
+    {
+        Set_Addr((y >> 3) + page, x);
+        Write_Data(maskTop);
+        Write_Data(maskTop);
+    }
+    /* 第 3 页（底部 8 行） */                                           /* 最后一页处理 */
+    Set_Addr((y >> 3) + 3, x);
+    Write_Data(maskDot);
+    Write_Data(maskDot);
+}
+
+
+/**
+ * @brief      显示 16x32 格式的无符号整数（支持小数）
+ * @param[in]  x:          列起始位置
+ * @param[in]  y:          行起始像素
+ * @param[in]  value:      要显示的数值
+ * @param[in]  maxDigits:  最大位数（包括整数和小数部分）
+ * @param[in]  fracDigits: 小数位数
+ * @param[in]  invert:     反色标志
+ * @retval     None
+ */
+void Show_Word_U_16x32(u8 x, u8 y, u32 value, u8 maxDigits, u8 fracDigits, bool invert)
+{
+    u32 div = 1;
+    u8  i;
+
+    if (maxDigits == 0) return;
+    if (maxDigits > 10) maxDigits = 10;                              /* 安全上限 */
+    if (fracDigits > maxDigits) fracDigits = maxDigits;
+    if (x + (u16)(16 * maxDigits) + (fracDigits ? 2 : 0) > MAX_COL) return;
+    if (y + 32 > MAX_ROW) return;
+
+    /* 预计算 10^(maxDigits-1) */                                       /* 用于提取数字 */
+    for (i = 1; i < maxDigits; i++)
+    {
+        div *= 10;
+    }
+
+                                                                     /* 如果有小数位，先画小数点（在整数与小数之间，宽 2 像素） */     /* 小数点位置计算 */
+    if (fracDigits) 
+   {
+                                                                     /* 小数点处于：从左到右第 (maxDigits - fracDigits) 个数字之后 */ /* 小数点坐标 */
+        u8 dotX = x + 16 * (maxDigits - fracDigits);
+        draw_dot_16x32(dotX, y, invert);
+   }
+
+    /* 逐位输出（高位到低位） */                                   
+    for (i = 0; i < maxDigits; i++)                                 /* 数字显示循环 */ 
+    {
+        u8 d = (u8)((value / div) % 10);
+
+        /* 计算该位的 x：小数点右侧的位整体右移 2 像素（避开小数点） */ /* 小数部分偏移 */
+        u8 isRightOfDot = (fracDigits && i >= (maxDigits - fracDigits));
+        u8 xi = x + 16 * i + (isRightOfDot ? 2 : 0);
+
+        Disp_Digit_16x32(xi, y, d, invert);
+
+        div /= 10;
+    }
+}
+
+
 
 /**
  * @brief      使用“大字符”（32x48，6 页 × 32 列）显示字符串

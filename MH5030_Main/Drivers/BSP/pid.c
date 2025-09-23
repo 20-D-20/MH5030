@@ -43,7 +43,7 @@ void pid_front_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter)
 //    pid->Td = 0;                             /* 微分时间，毫秒级 */
              
 #endif
-
+    
    /* 预处理使能、自整定使能均为一，PID自整定模式才可使用 */
     tune->preEnable        = 1;                /* 预处理使能置一 */
     tune->tuneEnable       = 1;                /* 自整定使能置一 */ 
@@ -152,8 +152,8 @@ void filter_init(FilterCtx *ctx,uint8_t N,uint8_t MEDIAN_N,float limit_step)
     ctx->N          = N;
     ctx->MEDIAN_N   = MEDIAN_N;
     ctx->limit_step = limit_step;
-    ctx->init_min   = 5.0f;                      /* 原逻辑：5~180 为可信范围 */
-    ctx->init_max   = 180.0f;
+    ctx->init_min   = 0.0f;                      /* 原逻辑：5~180 为可信范围 */
+    ctx->init_max   = 230.0f;
 
     /* 清零缓存与状态 */
     memset(ctx->sliding_window, 0, sizeof(ctx->sliding_window));
@@ -564,7 +564,7 @@ static void CalculationParameters(PidType *vPID, TuneObjectType *tune)
     vPID->Td = (zn[tune->controllerType][2] * tc);                             /* 计算微分时间Td */
     //#endif
 
-//    printf("KP:%4.2f, TI:%4.2f, TD:%4.2f \r\n",vPID->Kp,vPID->Ti,vPID->Td);
+    printf("KP:%4.2f, TI:%4.2f, TD:%4.2f \r\n",vPID->Kp,vPID->Ti,vPID->Td);
 
 }
 

@@ -25,11 +25,6 @@ typedef struct {
     uint8_t  enable;        // 使能状态
 } FanStatus_t;
 
-/* Exported constants --------------------------------------------------------*/
-#define FAN_MIN_RPM         500     // 最小转速
-#define FAN_MAX_RPM         4000    // 最大转速
-#define FAN_DEFAULT_RPM     2000    // 默认转速
-
 /* Exported variables --------------------------------------------------------*/
 extern FanStatus_t g_stFanStatus;
 

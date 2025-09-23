@@ -14,6 +14,44 @@ void Key_Manager_Init(void)
 }
 
 /**
+ * @brief  处理枪管设置模式按键
+ */
+void Process_Gun_Select_Mode_Key(uint8_t key)
+{
+    switch(key)
+    {
+        case KEY_UP:  /* 前翻页 */
+            Handle_Gun_Select(KEY_UP);
+            break;
+            
+        case KEY_DOWN:/* 后翻页 */
+            Handle_Gun_Select(KEY_DOWN);
+            break;
+            
+        case KEY_CONFIRM:/* 确认键 */
+//            if(g_pages[g_current_page_id].is_editable)
+//            {
+//                /* 智能温控页面特殊处理 */
+//                if(g_current_page_id == PAGE_GUN_SELECT)
+//                {
+//                    Send_UI_Message(MSG_PAGE_CHANGE, g_current_page_id, 0, 1);
+//                }
+//            }
+//            break;
+            
+        case KEY_RETURN:  /* ESC键 */
+            /* 温度显示页面，按ESC键进入枪管选择页面             */
+            if(g_pages[g_current_page_id].is_editable && g_current_page_id == PAGE_GUN_SELECT)
+            {
+                /* 温度显示页面进入枪管选择页面 */
+                g_current_mode = MODE_BROWSE;
+                g_current_page_id = PAGE_TEMP_DISPLAY;
+                Send_UI_Message(MSG_PAGE_CHANGE, g_current_page_id, 0, 0);    
+            }
+            break;
+    }
+}
+/**
  * @brief  处理浏览模式按键
  */
 void Process_Browse_Mode_Key(uint8_t key)
@@ -48,7 +86,15 @@ void Process_Browse_Mode_Key(uint8_t key)
             break;
             
         case KEY_RETURN:  /* ESC键 */
-            /* 浏览模式下无操作 */
+            /* 温度显示页面，按ESC键进入枪管选择页面             */
+            if(g_current_page_id == PAGE_TEMP_DISPLAY)
+            {
+                /* 温度显示页面进入枪管选择页面 */
+                g_current_mode = MODE_SELECT;
+                g_current_page_id = PAGE_GUN_SELECT;
+                Send_UI_Message(MSG_MODE_CHANGE, g_current_page_id, 0, 0);    
+            }
+
             break;
     }
 }
@@ -118,6 +164,38 @@ void Process_Autotune_Key(uint8_t key)
 				break;
 		}
 
+}
+
+/**
+ * @brief  处理枪管选择界面按键操作
+ */
+void Handle_Gun_Select(uint8_t key)
+{
+    if(key == KEY_UP)
+    {
+        if(g_current_gun_id > POLL_H2SO4_MIST)
+          {
+              g_current_gun_id--;
+          }
+          else if(g_current_gun_id == POLL_H2SO4_MIST)
+          {
+              g_current_gun_id = POLL_MERCURY;  /* 循环到最后页 */
+          }
+        
+    }
+    else if(key == KEY_DOWN)
+    {
+        if(g_current_gun_id < POLL_MERCURY)
+        {
+            g_current_gun_id++;
+        }
+        else if(g_current_gun_id == POLL_MERCURY)
+        {
+            g_current_gun_id = POLL_H2SO4_MIST;  /* 循环到第一页 */
+        }
+    }
+   Send_UI_Message(MSG_PAGE_CHANGE, g_current_page_id, 0, 1);
+//   Reset_Key_Counter();
 }
 
 /**
@@ -207,7 +285,7 @@ void Check_Autotune_Trigger(void)
 {
     uint32_t current_time = osKernelSysTick();
     
-    /* 超时重置（2秒内要按完7次） */
+    /* 超时重置（10秒内要按完7次） */
     if((current_time - g_key_counter.last_press_time) > OK_KEY_TIMEOUT)
     {
         g_key_counter.ok_press_count = 0;

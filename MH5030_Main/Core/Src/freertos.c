@@ -117,12 +117,10 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackTy
   * @param  None
   * @retval None
   */
-void MX_FREERTOS_Init(void) {
+void MX_FREERTOS_Init(void) 
+{
   /* USER CODE BEGIN Init */
 
-  /* 初始化页面数据 */
-   init_page_data();
-    
    /* 创建消息队列 */
    UI_Queue = xQueueCreate(10, sizeof(UIMessage_t));
    
@@ -147,14 +145,14 @@ void MX_FREERTOS_Init(void) {
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
-//  /* Create the thread(s) */
-//  /* definition and creation of HeaterCtrl_Task */
-//  osThreadDef(HeaterCtrl_Task, heaterctrl_task, osPriorityAboveNormal, 0, 128);
-//  HeaterCtrl_TaskHandle = osThreadCreate(osThread(HeaterCtrl_Task), NULL);
+  /* Create the thread(s) */
+  /* definition and creation of HeaterCtrl_Task */
+  osThreadDef(HeaterCtrl_Task, heaterctrl_task, osPriorityAboveNormal, 0, 256);
+  HeaterCtrl_TaskHandle = osThreadCreate(osThread(HeaterCtrl_Task), NULL);
 
-//  /* definition and creation of Fan_Task */
-//  osThreadDef(Fan_Task, fan_task, osPriorityNormal, 0, 48);
-//  Fan_TaskHandle = osThreadCreate(osThread(Fan_Task), NULL);
+  /* definition and creation of Fan_Task */
+  osThreadDef(Fan_Task, fan_task, osPriorityNormal, 0, 48);
+  Fan_TaskHandle = osThreadCreate(osThread(Fan_Task), NULL);
 
 //  /* definition and creation of TCouple_Task */
 //  osThreadDef(TCouple_Task, tcouple_task, osPriorityNormal, 0, 64);
@@ -164,9 +162,9 @@ void MX_FREERTOS_Init(void) {
 //  osThreadDef(DS18B20_Task, ds18b20_task, osPriorityNormal, 0, 64);
 //  DS18B20_TaskHandle = osThreadCreate(osThread(DS18B20_Task), NULL);
 
-  /* definition and creation of Wdg_Task */
-  osThreadDef(Wdg_Task, wdg_task, osPriorityRealtime , 0, 32);
-  Wdg_TaskHandle = osThreadCreate(osThread(Wdg_Task), NULL);
+//  /* definition and creation of Wdg_Task */
+//  osThreadDef(Wdg_Task, wdg_task, osPriorityRealtime , 0, 32);
+//  Wdg_TaskHandle = osThreadCreate(osThread(Wdg_Task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   
@@ -197,6 +195,7 @@ void heaterctrl_task(void const * argument)
     
     /* 硬件初始化 */
     tps02r_iic_init(&g_stTps02r_IICManger);                            /* 初始化tps02r */
+    tps02r_cfg_init();
     FM24CXX_iic_init(&fm24cxx_iicmanager);                             /* 初始化EEPROM */
     
     /* PID系统初始化 */
@@ -216,6 +215,7 @@ void heaterctrl_task(void const * argument)
     for(;;)
     {
         /* 读取前枪管温度 */
+        taskENTER_CRITICAL() ;
         if (tps02r_get_temp(TPS02R_CHAN1, &pt100_front) == TPS02R_FUN_OK)          
         {
             /* 滤波处理 */
@@ -234,11 +234,12 @@ void heaterctrl_task(void const * argument)
             g_stPidRear.Pv = combined_filter(&g_stFilterRear, pt100_rear);
             g_system_status.rear_temp_pv = g_stPidRear.Pv;
         }
+        
         else
         {
             g_system_status.temp_error |= 0x02;                        /* 腔体温度读取错误 */
         }
-        
+        taskEXIT_CRITICAL();
         /* 更新设定值 */
         g_stPidFront.Sv = g_system_status.front_temp_sv;
         g_stPidRear.Sv = g_system_status.rear_temp_sv;
@@ -337,18 +338,29 @@ void key_task(void const * argument)
             xSemaphoreTake(Data_Mutex, portMAX_DELAY);
             
             /* 根据当前模式处理按键 */
-            if(g_current_mode == MODE_BROWSE)
-            {
+            switch (g_current_mode) 
+           {
+            case MODE_BROWSE:
                 Process_Browse_Mode_Key(key);
-            }
-            else if(g_current_mode == MODE_EDIT)
-            {
+                break;
+            
+            case MODE_EDIT:
                 Process_Edit_Mode_Key(key);
-            }
-            else if(g_current_mode == MODE_AUTOTUNE)
-            {
+                break;
+            
+            case MODE_AUTOTUNE:
                 Process_Autotune_Key(key);
+                break;
+            
+            case MODE_SELECT:
+                Process_Gun_Select_Mode_Key(key);
+                break;
+
+            default:
+                /* 未知模式：可选择忽略、记录日志或做安全处理 */
+                break;
             }
+
             
             xSemaphoreGive(Data_Mutex);
         }
@@ -407,7 +419,8 @@ void ui_task(void const * argument)
                     break;
                     
                 case MSG_MODE_CHANGE:
-                    if(msg.page_id == PAGE_SMART_CONTROL)
+                    if(msg.page_id == PAGE_SMART_CONTROL ||
+                       msg.page_id == PAGE_GUN_SELECT)
                     {
                         Display_Page(msg.page_id);
                     }
@@ -441,8 +454,10 @@ void ui_task(void const * argument)
             if(g_current_page_id == PAGE_TEMP_DISPLAY && 
                g_current_mode == MODE_BROWSE)
             {
-                get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
-		   /* 温度显示页面 */
+//                /* 用于测试的温度获取 */
+//                get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
+                
+                /* 温度显示页面 */
                 need_temp_update = true;
             }
             else if(g_current_page_id == PAGE_DIOXIN_DISPLAY && 
@@ -460,8 +475,13 @@ void ui_task(void const * argument)
             {
                 if(g_current_page_id == PAGE_TEMP_DISPLAY)
                 {
-                    Disp_Word_UM(38, 24, 3, g_gun_temp_measured, 0, 0);
-                    Disp_Word_UM(38, 48, 3, g_cavity_temp_measured, 0, 0);
+                    /* 用于测试的温度显示*/
+//                    Show_Word_U_16x32(8,24,g_gun_temp_measured,3,0,false);
+//                    Show_Word_U_16x32(70,24,g_cavity_temp_measured,3,0,false);
+
+                    /* 实际测量的温度显示 */
+                    Show_Word_U_16x32(8,24,(u16)g_system_status.front_temp_pv,3,0,false);
+                    Show_Word_U_16x32(70,24,(u16)g_system_status.rear_temp_pv,3,0,false);
                 }
                 else if(g_current_page_id == PAGE_DIOXIN_DISPLAY)
                 {
@@ -501,6 +521,7 @@ void fan_task(void const * argument)
         }else
         {
              HAL_GPIO_WritePin(GPIOB, BELL_Pin, GPIO_PIN_RESET);
+             g_stFanStatus.fault = 0; 
         }
         osDelay(200);
     }

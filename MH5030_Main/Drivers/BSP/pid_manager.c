@@ -17,7 +17,7 @@ void Init_PID_Manager(void)
     /* 设置默认温度 */
     g_system_status.front_temp_sv = 120.0f;
     g_system_status.rear_temp_sv = 120.0f;
-    
+    g_system_status.mode  = PID_MODE_RUN ;
     /* 尝试从EEPROM加载参数 */
     if (!Load_All_Parameters())
     {
@@ -273,35 +273,35 @@ void Set_Default_Parameters(uint8_t group)
     {
         case PARAM_GROUP_120:
             /* 120℃默认参数 */
-            g_stPidFront.Kp = 10.0f;
-            g_stPidFront.Ti = 150.0f;
-            g_stPidFront.Td = 30.0f;
+            g_stPidFront.Kp = 173.92;
+            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Td = 0.0f;
             
-            g_stPidRear.Kp = 8.0f;
-            g_stPidRear.Ti = 180.0f;
-            g_stPidRear.Td = 35.0f;
+            g_stPidFront.Kp = 173.92;
+            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Td = 0.0f;
             break;
             
         case PARAM_GROUP_160:
             /* 160℃默认参数 */
-            g_stPidFront.Kp = 12.0f;
-            g_stPidFront.Ti = 200.0f;
-            g_stPidFront.Td = 40.0f;
+            g_stPidFront.Kp = 173.92;
+            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Td = 0.0f;
             
-            g_stPidRear.Kp = 10.0f;
-            g_stPidRear.Ti = 220.0f;
-            g_stPidRear.Td = 45.0f;
+            g_stPidFront.Kp = 173.92;
+            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Td = 0.0f;
             break;
             
         case PARAM_GROUP_220:
             /* 220℃默认参数 */
-            g_stPidFront.Kp = 15.0f;
-            g_stPidFront.Ti = 250.0f;
-            g_stPidFront.Td = 50.0f;
+            g_stPidFront.Kp = 173.92;
+            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Td = 0.0f;
             
-            g_stPidRear.Kp = 12.0f;
-            g_stPidRear.Ti = 280.0f;
-            g_stPidRear.Td = 55.0f;
+            g_stPidFront.Kp = 173.92;
+            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Td = 0.0f;
             break;
             
         default:

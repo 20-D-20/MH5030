@@ -16,7 +16,7 @@ extern "C" {
     
 /* 按键连击检测 */
 #define OK_KEY_COUNT_MAX    7       // OK键连击次数触发自整定
-#define OK_KEY_TIMEOUT      2000    // 连击超时时间(ms)
+#define OK_KEY_TIMEOUT      10000    // 连击超时时间(ms)
     
 /* 按键连击计数器 */
 typedef struct {
@@ -35,8 +35,10 @@ void Key_Manager_Init(void);
 void Process_Browse_Mode_Key(uint8_t key);
 void Process_Edit_Mode_Key(uint8_t key);
 void Process_Autotune_Key(uint8_t key);
+void Process_Gun_Select_Mode_Key(uint8_t key);
 void Handle_Page_Navigation(uint8_t key);
 void Handle_Value_Adjustment(uint8_t key);
+void Handle_Gun_Select(uint8_t key);
 void Check_Autotune_Trigger(void);
 void Reset_Key_Counter(void);
 void Send_UI_Message(MsgType_e type, uint8_t page_id, int16_t value, uint8_t refresh);
