@@ -15,9 +15,9 @@ void Init_PID_Manager(void)
     memset(&g_system_status, 0, sizeof(System_Status_t));
     
     /* 设置默认温度 */
-    g_system_status.front_temp_sv = 120.0f;
-    g_system_status.rear_temp_sv = 120.0f;
-    g_system_status.mode  = PID_MODE_RUN ;
+    g_system_status.front_temp_sv = 160.0f;
+    g_system_status.rear_temp_sv = 160.0f;
+    g_system_status.mode  = PID_MODE_RUN ;                  /* 开机默认为运行模式 */
     /* 尝试从EEPROM加载参数 */
     if (!Load_All_Parameters())
     {
@@ -110,12 +110,12 @@ void Check_And_Switch_Group(void)
  */
 bool Load_All_Parameters(void)
 {
-    uint8_t result;
     
     /* 从EEPROM读取 */
-    result = FM_ReadByteseq(EEPROM_BASE_ADDR, &g_pid_storage, sizeof(PID_Storage_t));
-    
-    if (result != 0)
+    g_system_status.param_loaded_error = FM_ReadByteseq(EEPROM_BASE_ADDR, 
+                                                        &g_pid_storage, sizeof(PID_Storage_t));
+
+    if (g_system_status.param_loaded_error != 0)
     {
         return false;    /* 读取失败 */
     }
@@ -164,12 +164,12 @@ bool Verify_Parameters(PID_Storage_t *storage)
         return false;
     }
     
-    /* 计算并验证校验和 */
-    calc_checksum = Calculate_Checksum(storage);
-    if (calc_checksum != storage->checksum)
-    {
-        return false;
-    }
+//    /* 计算并验证校验和 */
+//    calc_checksum = Calculate_Checksum(storage);
+//    if (calc_checksum != storage->checksum)
+//    {
+//        return false;
+//    }
     
     return true;
 }
@@ -277,31 +277,31 @@ void Set_Default_Parameters(uint8_t group)
             g_stPidFront.Ti = 347870.00;
             g_stPidFront.Td = 0.0f;
             
-            g_stPidFront.Kp = 173.92;
-            g_stPidFront.Ti = 347870.00;
-            g_stPidFront.Td = 0.0f;
+            g_stPidRear.Kp = 45.31;
+            g_stPidRear.Ti = 347855.41;
+            g_stPidRear.Td = 0.0f;
             break;
             
         case PARAM_GROUP_160:
             /* 160℃默认参数 */
-            g_stPidFront.Kp = 173.92;
-            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Kp = 183.56;
+            g_stPidFront.Ti = 347871.72;
             g_stPidFront.Td = 0.0f;
             
-            g_stPidFront.Kp = 173.92;
-            g_stPidFront.Ti = 347870.00;
-            g_stPidFront.Td = 0.0f;
+            g_stPidRear.Kp = 173.92;
+            g_stPidRear.Ti = 347870.00;
+            g_stPidRear.Td = 0.0f;
             break;
             
         case PARAM_GROUP_220:
             /* 220℃默认参数 */
-            g_stPidFront.Kp = 173.92;
-            g_stPidFront.Ti = 347870.00;
+            g_stPidFront.Kp = 102.55;
+            g_stPidFront.Ti = 347849.81;
             g_stPidFront.Td = 0.0f;
             
-            g_stPidFront.Kp = 173.92;
-            g_stPidFront.Ti = 347870.00;
-            g_stPidFront.Td = 0.0f;
+            g_stPidRear.Kp = 20.77;
+            g_stPidRear.Ti = 347769.56;
+            g_stPidRear.Td = 0.0f;
             break;
             
         default:
@@ -367,7 +367,7 @@ void Stop_Autotune(void)
 {
     /* 清除自整定标志 */
     g_system_status.autotune_request = 0;
-    g_system_status.mode = PID_MODE_RUN;
+    g_system_status.mode = PID_MODE_RUN;                /* 切换运行模式 */
     
     /* 关闭自整定 */
     g_stPidFrontAuto.tuneEnable = 0;
@@ -384,12 +384,24 @@ void Check_Autotune_Complete(void)
     /* 更新穿越计数 */
     g_system_status.front_cross_cnt = g_stPidFrontAuto.zeroAcrossCounter;
     g_system_status.rear_cross_cnt = g_stPidRearAuto.zeroAcrossCounter;
+
+    /* 一路整定完成后关闭加热，防止持续加热 */
+    if(g_stPidFrontAuto.tuneEnable == 0  )
+    {
+        g_stPidFront.OUT = 0;
+    }
+
+    if(g_stPidRearAuto.tuneEnable == 0)
+    {
+        g_stPidRear.OUT = 0;
+    }
     
     /* 检查两路是否都完成 */
     if (g_stPidFrontAuto.tuneEnable == 0 && g_stPidRearAuto.tuneEnable == 0)
     {
         g_system_status.autotune_complete = 1;
-        Save_Autotune_Results();
+        /* 保存整定后的参数 */
+        Save_Autotune_Results();     
         Stop_Autotune();
     }
 }
@@ -413,13 +425,15 @@ void Save_Autotune_Results(void)
  * @param      无
  * @retval     无
  */
-void Update_System_Status(void)
+void Update_Autotune_Status(void)
 {
-    /* 更新自整定状态 */
-    if (g_system_status.mode == PID_MODE_AUTOTUNE)
-    {
-        Check_Autotune_Complete();
-    }
+       
+   /* 更新自整定状态 */
+   if (g_system_status.mode == PID_MODE_AUTOTUNE)
+   {
+       Check_Autotune_Complete();
+   }
+
 }
 
 /**

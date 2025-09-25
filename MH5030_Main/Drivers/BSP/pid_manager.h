@@ -8,6 +8,13 @@
 #include <string.h>
 
 /* ---------------------- 宏定义 ---------------------- */
+
+/* pid自增定参数配置 */
+#define DEADZONE            0.02            /* 死区 */
+#define REAR_OUTPUTSTEP     200            /* 满功率1000 - 25%功率输出    */
+#define FRONT_OUTPUTSTEP    1000           /* 满功率1000 - 100%功率输出    */
+
+/* pid存储配置 */
 #define PID_MAGIC_WORD      0x5AA55AA5      /* EEPROM魔术字 */
 #define PID_VERSION         0x01            /* 参数版本号 */
 #define EEPROM_BASE_ADDR    0x0000          /* EEPROM基地址 */
@@ -23,8 +30,8 @@
 #define PARAM_GROUP_MAX     3               /* 最大组数 */
 
 /* 系统运行模式 */
-#define PID_MODE_STOP       0                   /* 停止模式 */
-#define PID_MODE_RUN        1                   /* 运行模式 */
+#define PID_MODE_STOP       0               /* 停止模式 */
+#define PID_MODE_RUN        1               /* 运行模式 */
 #define PID_MODE_AUTOTUNE   2               /* 自整定模式 */
 
 /* 自整定完成标志 */
@@ -80,6 +87,7 @@ typedef struct
     /* 错误状态 */
     uint8_t error_code;                   /* 错误代码 */
     uint8_t temp_error;                   /* 温度错误标志 */
+    uint8_t param_loaded_error;           /* 参数加载错误标志位 */
 } System_Status_t;
 
 /* ---------------------- 全局变量声明 ---------------------- */
@@ -113,7 +121,7 @@ void Check_Autotune_Complete(void);
 void Save_Autotune_Results(void);
 
 /* 状态管理 */
-void Update_System_Status(void);
+void Update_Autotune_Status(void);
 void Clear_Error_Status(void);
 
 #endif /* __PID_MANAGER_H */

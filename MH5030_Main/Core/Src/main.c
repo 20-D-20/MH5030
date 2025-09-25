@@ -42,6 +42,7 @@
 #include "pid.h"
 #include "fan_control.h"
 #include "key.h"
+#include "pid_manager.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -115,16 +116,16 @@ int main(void)
 //  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   
-  delay_init(72);                     
+  delay_init(72);                     /* 初始化延时函数 */
   
 /*-------------------------------------FAN TEST PROGRAM----------------------------------------------*/
 
 //  HAL_TIM_PWM_Start (&htim3, TIM_CHANNEL_1);
 //  HAL_GPIO_WritePin (GPIOB,GPIO_PIN_3,GPIO_PIN_RESET);
-    Fan_Init();
-    Fan_Start();
-    Filter_Init_All();
-  
+//  Fan_Init();
+//    Fan_Start();
+//    Filter_Init_All();
+//  
 /*-------------------------------------FAN TEST PROGRAM----------------------------------------------*/
   
 /*-------------------------------------PWM TEST PROGRAM----------------------------------------------*/
@@ -311,26 +312,17 @@ int main(void)
     MX_FREERTOS_Init();
 
     /* Start scheduler */
-    osKernelStart();
+    osKernelStart(); 
 
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-    
-    float pt100_1 = 0.0;
-    float pt100_2 = 0.0;
-    filter_init(&g_stFilterFront, /*N=*/10, /*MEDIAN_N=*/5, /*limit_step=*/0.5f);    /* 滤波器参数配置 */
-    filter_init(&g_stFilterRear, /*N=*/10, /*MEDIAN_N=*/5, /*limit_step=*/0.5f);    /* 滤波器参数配置 */
-    
+  
+  
 while (1)
 {
-    tps02r_get_temp(TPS02R_CHAN1,&pt100_1);
-    tps02r_get_temp(TPS02R_CHAN2,&pt100_2);
-    printf("Pt100_1 = %5.3f,Pt100_2 = %5.3f\n",pt100_1,pt100_2);
-    printf("Pt100_1_filter = %5.3f,Pt100_2_filter = %5.3f\n"
-            ,combined_filter(&g_stFilterFront,pt100_1),combined_filter(&g_stFilterRear,pt100_2));
-    delay_ms(500);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -406,7 +398,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   {
     HAL_IncTick();
   }
-
+  
   /* USER CODE END Callback 1 */
 }
 

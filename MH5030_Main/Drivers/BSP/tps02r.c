@@ -1,6 +1,6 @@
 #include "tps02r.h"
 // 定义全局IIC管理结构体和初始化配置结构体
-IICManager_ST               g_stTps02r_IICManger{0};
+IICManager_ST   g_stTps02r_IICManger = {0};
 
 void tps02r_iic_init(IICManager_ST *pstIIC)
 {

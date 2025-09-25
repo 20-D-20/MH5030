@@ -6,8 +6,8 @@ uint8_t g_current_gun_id = POLL_H2SO4_MIST;
 SystemMode_e g_current_mode = MODE_BROWSE;
 uint8_t g_current_page_id = PAGE_STARTUP;
 PageData_t g_pages[PAGE_MAX];
-int16_t g_gun_temp_measured = 0;
-int16_t g_cavity_temp_measured = 0;
+//int16_t g_gun_temp_measured = 0;
+//int16_t g_cavity_temp_measured = 0;
 int16_t g_dioxin_temp1 = 0;
 int16_t g_dioxin_temp2 = 0;
 
@@ -30,43 +30,43 @@ void init_page_data(void)
     g_pages[PAGE_STARTUP].page_id = PAGE_STARTUP;
     g_pages[PAGE_STARTUP].is_editable = false;
     g_pages[PAGE_STARTUP].current_value = 0;
-    
-    /* 温度显示页面 */
-    g_pages[PAGE_TEMP_DISPLAY].page_id = PAGE_TEMP_DISPLAY;
-    g_pages[PAGE_TEMP_DISPLAY].is_editable = false;            /* 可进入编辑模式 */
-    g_pages[PAGE_TEMP_DISPLAY].current_value = 0;              /* 用于存储按键次数 */
 
-    /* 枪管选择页面 */
-    g_pages[PAGE_GUN_SELECT].page_id = PAGE_GUN_SELECT;
-    g_pages[PAGE_GUN_SELECT].is_editable = true;               /* 可进入编辑模式 */
-    g_pages[PAGE_GUN_SELECT].current_value = 0;                /* 用于存储按键次数 */
-    
     /* 枪管温度设置 */
     g_pages[PAGE_GUN_SETTING].page_id = PAGE_GUN_SETTING;
     g_pages[PAGE_GUN_SETTING].is_editable = true;
-    g_pages[PAGE_GUN_SETTING].current_value = 101;             /* 初始设定值 */
+    g_pages[PAGE_GUN_SETTING].current_value =g_system_status.front_temp_sv;             /* 初始设定值 */
     g_pages[PAGE_GUN_SETTING].min_value = 0;
     g_pages[PAGE_GUN_SETTING].max_value = 240;
-    g_pages[PAGE_GUN_SETTING].step = 5;                        /* 温度设置步进 */ 
+    g_pages[PAGE_GUN_SETTING].step = 5;                                                 /* 温度设置步进 */
+    
+    /* 温度显示页面 */
+    g_pages[PAGE_TEMP_DISPLAY].page_id = PAGE_TEMP_DISPLAY;
+    g_pages[PAGE_TEMP_DISPLAY].is_editable = false;                                     /* 可进入编辑模式 */
+    g_pages[PAGE_TEMP_DISPLAY].current_value = 0;                                       /* 用于存储按键次数 */
+
+    /* 枪管选择页面 */
+    g_pages[PAGE_GUN_SELECT].page_id = PAGE_GUN_SELECT;
+    g_pages[PAGE_GUN_SELECT].is_editable = true;                                        /* 可进入编辑模式 */
+    g_pages[PAGE_GUN_SELECT].current_value = 0;                                         /* 用于存储按键次数 */
+
+    /* 二噁英枪管专属气流温度显示页面 */
+    g_pages[PAGE_Airflow_DISPLAY].page_id = PAGE_Airflow_DISPLAY;                       /* 只读界面 */
+    g_pages[PAGE_Airflow_DISPLAY].is_editable = false;
+    g_pages[PAGE_Airflow_DISPLAY].current_value = 0;
     
     /* 腔体温度设置 */
     g_pages[PAGE_CAVITY_SETTING].page_id = PAGE_CAVITY_SETTING;
     g_pages[PAGE_CAVITY_SETTING].is_editable = true;
-    g_pages[PAGE_CAVITY_SETTING].current_value = 120;          /* 初始设定值 */
+    g_pages[PAGE_CAVITY_SETTING].current_value = g_system_status.rear_temp_sv;          /* 初始设定值 */
     g_pages[PAGE_CAVITY_SETTING].min_value = 0;
     g_pages[PAGE_CAVITY_SETTING].max_value = 240;
-    g_pages[PAGE_CAVITY_SETTING].step = 5;                     /* 温度设置步进 */ 
+    g_pages[PAGE_CAVITY_SETTING].step = 5;                                              /* 温度设置步进 */ 
     
     /* 智能温控调节 */
     g_pages[PAGE_SMART_CONTROL].page_id = PAGE_SMART_CONTROL;
-    g_pages[PAGE_SMART_CONTROL].is_editable = true;            /* 可进入编辑模式 */
-    g_pages[PAGE_SMART_CONTROL].current_value = 0;             /* 用于存储按键次数 */
+    g_pages[PAGE_SMART_CONTROL].is_editable = true;                                     /* 可进入编辑模式 */
+    g_pages[PAGE_SMART_CONTROL].current_value = 0;                                      /* 用于存储按键次数 */
     
-    /* 二噁英显示页面 */
-    g_pages[PAGE_DIOXIN_DISPLAY].page_id = PAGE_DIOXIN_DISPLAY;
-    g_pages[PAGE_DIOXIN_DISPLAY].is_editable = false;
-    g_pages[PAGE_DIOXIN_DISPLAY].current_value = 0;
-  
 }
 
 /**
@@ -101,8 +101,8 @@ void Display_Page(uint8_t page_id)
                 Display_Smart_Control_Page();
             break;
             
-        case PAGE_DIOXIN_DISPLAY:
-            Display_Dioxin_Page();
+        case PAGE_Airflow_DISPLAY:
+            Display_Airflow_Page();
             break;
         
         case PAGE_GUN_SELECT:
@@ -132,12 +132,8 @@ void Display_Temp_Page(void)
      /* 分割线 */
     draw_vspan(64,1,64);
     draw_hline(1,123,18);
-        
-//    /* 显示测量值 */
-//    get_test_temperatures(&g_gun_temp_measured, &g_cavity_temp_measured);
-//    Show_Word_U_16x32(8,24,g_gun_temp_measured,3,0,false);
-//    Show_Word_U_16x32(70,24,g_cavity_temp_measured,3,0,false);
 
+    /* 显示测量值 */
     Show_Word_U_16x32(8,24,(u16)g_system_status.front_temp_pv,3,0,false);
     Show_Word_U_16x32(70,24,(u16)g_system_status.rear_temp_pv,3,0,false);
 }
@@ -199,14 +195,14 @@ void Display_Cavity_Setting_Page(void)
  */
 void Display_Smart_Control_Page(void)
 {
-    extern KeyPressCounter_t g_key_counter;
+    extern KeyPressCounter_t g_stOkCntrAutotune;
     
     DispString(16, 0, "智能温控调节", false);
     draw_hline(1, 127, 20);
     
     DispString(32, 32, "已按:", false);
-    Show_Word_U(72, 32, g_key_counter.ok_press_count, 1, 0, 
-                g_key_counter.ok_press_count > 0);
+    Show_Word_U(72, 32, g_stOkCntrAutotune.ok_press_count, 1, 0, 
+                g_stOkCntrAutotune.ok_press_count > 0);
     DispString(80, 32, "/", false);
     Show_Word_U(88, 32, OK_KEY_COUNT_MAX , 1, 0, false);
 }
@@ -234,33 +230,19 @@ void Display_Autotune_Progress_Page(void)
     Show_Word_U(72, 32, progress, 1, 0, true);
     DispString(80, 32, "/", false);
     Show_Word_U(88, 32, 5, 1, 0, false);
-    
-//    /* 显示提示信息 */
-//    DispString(16, 48, "ESC键停止", false);
 
 }
 
 /**
  * @brief  显示二噁英页面
  */
-void Display_Dioxin_Page(void)
+void Display_Airflow_Page(void)
 {
-    /* 显示标题 */
-    dispHzChar(24, 0, 33, false);  /* 噁 */
-    DispString(8, 0, "二", false);
-    DispString(40, 0, "英", false);
-    DispString(80, 0, "3091", false);
-    
-    /* 分割线 */
-    draw_hline(1, 127, 18);
-    draw_vspan(64, 1, 64);
-    
-    /* 获取并显示温度 */
-    get_dioxin_temperatures(&g_dioxin_temp1, &g_dioxin_temp2);
-    Show_Word_U(14, 32, g_dioxin_temp1, 3, 0, false);
-    DispString(38, 32, "℃", false);
-    Show_Word_U(78, 32, g_dioxin_temp2, 3, 0, false);
-    DispString(102, 32, "℃", false);
+
+    DispString(32, 0, "气流温度", false);
+    draw_hline(1, 127, 20);
+    Show_Word_U(48, 32, g_dioxin_temp1, 3, 0, false);
+    DispString(74, 32, "℃", false);
 }
 
 /**

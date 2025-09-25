@@ -45,12 +45,12 @@ void Fan_Init(void)
     /* 初始化PWM输出 */                                                          /* TIM3_CH1 - PB4 */
     Fan_PWM_Init();
     
-    /* 初始化转速检测 */                                                         /* FFG信号输入 */
+    /* 初始化转速检测 */                                                            /* FFG信号输入 */
     Fan_Capture_Init();
     
-    /* 设置默认参数 */                                                           /* 默认配置 */
-    fan.duty_cycle = 95;                                                         /* 默认85%占空比 */
-    fan.enable = 0;                                                              /* 默认关闭 */
+    /* 设置默认参数 */                                                             /* 默认配置 */
+    fan.duty_cycle = 100;                                                    /* 默认85%占空比 */
+    fan.enable = 0;                                                          /* 默认关闭 */
     
     /* 关闭风扇 */                                                               /* 初始状态 */
     Fan_Stop();
@@ -79,13 +79,13 @@ static void Fan_Capture_Init(void)
     /* 使能时钟 */                                                               /* GPIOA时钟 */
     __HAL_RCC_GPIOA_CLK_ENABLE();
     
-    /* 配置PA15为输入 (FFG信号) */                                               /* 上升沿触发 */
+    /* 配置PA15为输入 (FFG信号) */                                                  /* 上升沿触发 */
     GPIO_InitStruct.Pin = FFG_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(FFG_GPIO_Port, &GPIO_InitStruct);
     
-    /* 配置外部中断 */                                                           /* 优先级设置 */
+    /* 配置外部中断 */                                                             /* 优先级设置 */
     HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }

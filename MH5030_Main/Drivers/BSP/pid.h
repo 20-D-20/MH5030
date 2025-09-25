@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include "adc.h"
+#include "usart.h"
 #include "gpio.h"
 #include "ntc.h"
 #include "stdio.h"
@@ -12,15 +13,15 @@
 
 /* ---------------------- PID模式选择 ---------------------- */
 
-//#define Test                              /* 自整定测量pid参数 */
-#define Run                                 /* 已知pid参数，开始工作模式 */
+//#define Test                             /* 自整定测量pid参数 */
+#define Run                                /* 已知pid参数，开始工作模式 */
 
 /* ---------------------- 滤波器参数配置 ---------------------- */
 
-#define LAG_PHASE    10                   /* 迟滞时间 */
-#define PI           3.1415
-#define SLIDING_MAX   10                  /* 原 N=10 */
-#define MEDIAN_MAX     5                  /* 原 MEDIAN_N=5（建议 3~7，需 ≤ MEDIAN_MAX 且最好为奇数） */
+#define LAG_PHASE     10                   /* 迟滞时间 */
+#define PI            3.1415
+#define SLIDING_MAX   10                   /* 原 N=10 */
+#define MEDIAN_MAX     5                   /* 原 MEDIAN_N=5（建议 3~7，需 ≤ MEDIAN_MAX 且最好为奇数） */
 
 typedef struct {
     /* 配置参数 */
@@ -69,7 +70,7 @@ typedef struct Pid
     float OUT;                            /* 实际控制输出值 */
                 
     int   C1ms;                           /* 1ms定时计数（外部计时器辅助用） */
-    int   pwmcycle;                       /* PWM周期（定时器分辨率） */
+    int   pwm_high;                       /* pwm输出上限 */
                 
     int   times;                          /* 执行次数计数 */
                 

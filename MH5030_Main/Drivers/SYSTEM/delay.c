@@ -1,200 +1,123 @@
+#define DELAY_USE_SYSTICK   0   //0，使用定时器；1，使用systick
+#define SYSTEM_SUPPORT_OS	1
+
+
 #include "delay.h"
-/* 添加公共头文件 (FreeRTOS 需要用到) */
+#if SYSTEM_SUPPORT_OS 						//如果需要支持OS.
 #include "FreeRTOS.h"
 #include "task.h"
+#include "cmsis_os.h"
+#endif
 
-static uint16_t  g_fac_us = 0;      /* us延时倍乘数 */
+//////////////////////////////////////////////////////////////////////////////////
 
-/* 如果SYS_SUPPORT_OS定义了,说明要支持OS了(不限于UCOS) */
-#if SYS_SUPPORT_OS
 
-extern void xPortSysTickHandler(void);
+static u32 fac_us=72;						//us延时倍乘数
+#if SYSTEM_SUPPORT_OS 						//如果需要支持OS.
+static u16 fac_ms=1;				        //ms延时倍乘数,在os下,代表每个节拍的ms数
+#endif
 
-/**
- * @brief       systick中断服务函数,使用OS时用到
- * @param       ticks: 延时的节拍数
- * @retval      无
- */
-void SysTick_Handler(void)
+#if DELAY_USE_SYSTICK
+    #define DELAY_COUNTUP   0                                       //计数模式
+    #define DELAY_LOAD      (SysTick->LOAD)                         //重载值
+    #define DELAY_TICKS(n)     (fac_us*(n))                                //每微秒计数
+    #define DELAY_CNT       (SysTick->VAL)                          //计数值
+#else
+    #define DELAY_COUNTUP   1                                       //计数模式
+    #define DELAY_LOAD      (DELAY_TIM->ARR)                        //重载值
+    #define DELAY_TICKS(n)     (fac_us/(DELAY_TIM->PSC)*(n))               //每微秒的计数次数
+    #define DELAY_CNT       (DELAY_TIM->CNT)                        //计数值
+#endif
+
+//初始化延迟函数
+//当使用ucos的时候,此函数会初始化ucos的时钟节拍
+//SYSTICK的时钟固定为AHB时钟
+//SYSCLK:系统时钟频率，不开系统无用
+void delay_init(u16 SYSCLK)
 {
-    HAL_IncTick();                                              /* 1ms出发一次 */
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)  /* OS开始跑了,才执行正常的调度处理 */
-    {
-        xPortSysTickHandler();
-    }
+#if DELAY_USE_SYSTICK
+
+#if SYSTEM_SUPPORT_OS 						//如果需要支持OS.
+	u32 reload = SYSCLK;					    //每秒钟的计数次数 单位为K
+	reload *= 1000000UL/configTICK_RATE_HZ;	//根据根据configTICK_RATE_HZ设定溢出时间
+											//reload为24位寄存器,最大值:16777216,在180M下,约合0.745s左右
+	fac_ms = 1000/configTICK_RATE_HZ;		//代表OS可以延时的最少单位
+	SysTick->LOAD = reload - 1; 					//每1/OS_TICKS_PER_SEC秒中断一次
+	SysTick->VAL = 0;
+	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;//开启SYSTICK中断
+	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk; //开启SYSTICK
+#else
+    u32 ticks;
+//    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);//SysTick频率为HCLK
+//	while (HAL_SYSTICK_Config(SystemCoreClock / (1000U / uwTickFreq)) > 0U);
+    ticks = SystemCoreClock / (1000U / uwTickFreq);
+    SysTick->LOAD  = (uint32_t)(ticks - 1UL);                         /* set reload register */
+//    NVIC_SetPriority (SysTick_IRQn, (1UL << __NVIC_PRIO_BITS) - 1UL); /* set Priority for Systick Interrupt */
+    SysTick->VAL   = 0UL;                                             /* Load the SysTick Counter Value */
+    SysTick->CTRL  = SysTick_CTRL_CLKSOURCE_Msk |
+//                   SysTick_CTRL_TICKINT_Msk   |
+                   SysTick_CTRL_ENABLE_Msk;                         /* Enable SysTick IRQ and SysTick Timer */
+
+#endif
+#endif
+	fac_us = SystemCoreClock/1000000UL;						//不论是否使用OS, fac_us都需要使用
+
 }
-#endif
 
-/**
- * @brief       初始化延迟函数
- * @param       sysclk: 系统时钟频率, 即CPU频率(HCLK)
- * @retval      无
- */
-void delay_init(uint16_t sysclk)
+#define DELAY_TIM   (TIM2)
+//延时nus
+//nus:要延时的us数.
+//nus:0~190887435(最大值即2^32/fac_us@fac_us=22.5)
+u32 delay_us(u32 nus)
 {
-#if SYS_SUPPORT_OS /* 如果需要支持OS. */
-    uint32_t reload;
+	//使用定时器6，分频71，定时器频率为72M/(71+1)=1M，即1us
+/*	u32 startCnt = __HAL_TIM_GET_COUNTER(DELAY_TIM);
+	while ((__HAL_TIM_GET_COUNTER(DELAY_TIM) - startCnt) <= nus
+        || (__HAL_TIM_GET_COUNTER(DELAY_TIM) + __HAL_TIM_GET_AUTORELOAD(DELAY_TIM) - startCnt) <= nus);
+*/
+	u32 ticks;
+	u32 told,tnow,tcnt=0;
+	u32 reload = DELAY_LOAD;				//LOAD的值
+	ticks = DELAY_TICKS(nus); 						//需要的节拍数
+	told = DELAY_CNT;        				//刚进入时的计数器值
+	while(1)
+	{
+		tnow = DELAY_CNT;
+		if(tnow != told)
+		{
+#if DELAY_COUNTUP
+            tcnt += (tnow > told) ? (tnow - told) : (reload + tnow - told); //这里注意TIM6是一个递增的计数器
+#else
+			tcnt += (tnow < told) ? (told - tnow) : (reload + told - tnow);	//这里注意一下SYSTICK是一个递减的计数器就可以了.
 #endif
-    SysTick->CTRL = 0;                                          /* 清Systick状态，以便下一步重设，如果这里开了中断会关闭其中断 */
-    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK_DIV8);   /* SYSTICK使用内核时钟源8分频,因systick的计数器最大值只有2^24 */
-
-    g_fac_us = sysclk / 8;                                      /* 不论是否使用OS,g_fac_us都需要使用,作为1us的基础时基 */
-#if SYS_SUPPORT_OS                                              /* 如果需要支持OS. */
-    reload = sysclk / 8;                                        /* 每秒钟的计数次数 单位为M */
-    reload *= 1000000 / configTICK_RATE_HZ;                     /* 根据delay_ostickspersec设定溢出时间
-                                                                 * reload为24位寄存器,最大值:16777216,在9M下,约合1.86s左右
-                                                                 */
-    SysTick->CTRL |= 1 << 1;                                    /* 开启SYSTICK中断 */
-    SysTick->LOAD = reload;                                     /* 每1/delay_ostickspersec秒中断一次 */
-    SysTick->CTRL |= 1 << 0;                                    /* 开启SYSTICK */
-#endif
-}
-
-#if SYS_SUPPORT_OS  /* 如果需要支持OS, 用以下代码 */
-
-/**
- * @brief       延时nus
- * @param       nus: 要延时的us数.
- * @note        nus取值范围: 0 ~ 477218588(最大值即2^32 / g_fac_us @g_fac_us = 9)
- * @retval      无
- */
-void delay_us(uint32_t nus)
-{
-    uint32_t ticks;
-    uint32_t told, tnow, tcnt = 0;
-    uint32_t reload;
-    
-    reload = SysTick->LOAD;     /* LOAD的值 */
-    ticks = nus * g_fac_us;     /* 需要的节拍数 */
-    told = SysTick->VAL;        /* 刚进入时的计数器值 */
-
-    while (1)
-    {
-        tnow = SysTick->VAL;
-
-        if (tnow != told)
-        {
-            if (tnow < told)
+			told = tnow;
+			if(tcnt >= ticks)
             {
-                tcnt += told - tnow;    /* 这里注意一下SYSTICK是一个递减的计数器就可以了. */
-            }
-            else
-            {
-                tcnt += reload - tnow + told;
-            }
-
-            told = tnow;
-
-            if (tcnt >= ticks) break;   /* 时间超过/等于要延迟的时间,则退出. */
-        }
-    }
+                break;          //时间超过/等于要延迟的时间,则退出.
+			}
+		}
+	}
+    return tcnt;
 }
 
-/**
- * @brief       延时nms
- * @param       nms: 要延时的ms数 (0< nms <= 65535)
- * @retval      无
- */
-void delay_ms(uint16_t nms)
+//延时nms,会引起任务调度
+//nms:要延时的ms 数
+//nms:0~65535
+void delay_ms(u32 nms)
 {
-    uint32_t i;
-
-    for (i=0; i<nms; i++)
-    {
-        delay_us(1000);
-    }
-}
-
-#else  /* 不使用OS时, 用以下代码 */
-
-/**
- * @brief       延时nus
- * @param       nus: 要延时的us数.
- * @note        注意: nus的值,不要大于1864135us(最大值即2^24 / g_fac_us  @g_fac_us = 9)
- * @retval      无
- */
-void delay_us(uint32_t nus)
-{
-    uint32_t temp;
-    SysTick->LOAD = nus * g_fac_us; /* 时间加载 */
-    SysTick->VAL = 0x00;            /* 清空计数器 */
-    SysTick->CTRL |= 1 << 0 ;       /* 开始倒数 */
-
-    do
-    {
-        temp = SysTick->CTRL;
-    } while ((temp & 0x01) && !(temp & (1 << 16))); /* CTRL.ENABLE位必须为1, 并等待时间到达 */
-
-    SysTick->CTRL &= ~(1 << 0) ;    /* 关闭SYSTICK */
-    SysTick->VAL = 0X00;            /* 清空计数器 */
-}
-
-/**
- * @brief       延时nms
- * @param       nms: 要延时的ms数 (0< nms <= 65535)
- * @retval      无
- */
-void delay_ms(uint16_t nms)
-{
-    uint32_t repeat = nms / 1000;   /*  这里用1000,是考虑到可能有超频应用,
-                                     *  比如128Mhz的时候, delay_us最大只能延时1048576us左右了
-                                     */
-    uint32_t remain = nms % 1000;
-
-    while (repeat)
-    {
-        delay_us(1000 * 1000);      /* 利用delay_us 实现 1000ms 延时 */
-        repeat--;
-    }
-
-    if (remain)
-    {
-        delay_us(remain * 1000);    /* 利用delay_us, 把尾数延时(remain ms)给做了 */
-    }
-}
-
-/**
-  * @brief HAL库内部函数用到的延时
-           HAL库的延时默认用Systick，如果我们没有开Systick的中断会导致调用这个延时后无法退出
-  * @param Delay 要延时的毫秒数
-  * @retval None
-  */
-void HAL_Delay(uint32_t Delay)
-{
-     delay_ms(Delay);
-}
-
+	u32 i;
+#if SYSTEM_SUPPORT_OS 						//如果需要支持OS.
+	if(xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)//系统已经运行
+	{
+		if(nms >= fac_ms) //延时的时间大于OS 的最少时间周期
+		{
+			vTaskDelay(nms/fac_ms); //FreeRTOS 延时
+		}
+		nms %= fac_ms; //OS 已经无法提供这么小的延时了,
+		//采用普通方式延时
+	}
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	for(i=0;i<nms;i++) delay_us(1000);//普通方式延时
+}
 
 

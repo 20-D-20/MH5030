@@ -15,20 +15,25 @@ extern "C" {
 #endif
     
 /* 按键连击检测 */
-#define OK_KEY_COUNT_MAX    7       // OK键连击次数触发自整定
-#define OK_KEY_TIMEOUT      10000    // 连击超时时间(ms)
+#define OK_KEY_COUNT_MAX    7       /* OK键连击次数触发自整定 */
+#define OK_KEY_TIMEOUT      10000   /* 连击超时时间(ms) - 10s */
+
+#define ESC_KEY_COUNT_MAX   2       /* OK键连击次数触发自整定 */
+#define ESC_KEY_TIMEOUT     1000    /* 连击超时时间(ms)- 1s */
     
 /* 按键连击计数器 */
 typedef struct {
-    uint8_t ok_press_count;        /* OK键连续按下计数 */
-    uint32_t last_press_time;      /* 上次按键时间 */
-    uint8_t autotune_triggered;    /* 自整定已触发标志 */
+    uint8_t  ok_press_count;        /* OK键连续按下计数 */
+    uint32_t last_press_time;       /* 上次按键时间 */
+    uint8_t  autotune_triggered;    /* 自整定已触发标志 */
+    uint8_t  esc_press_count;       /* ESC键连续按下计数 */        
 } KeyPressCounter_t;
 
 /* 全局变量声明 */
 extern QueueHandle_t UI_Queue;
 extern SemaphoreHandle_t Data_Mutex;
-extern KeyPressCounter_t g_key_counter;
+extern KeyPressCounter_t g_stOkCntrAutotune;
+extern KeyPressCounter_t g_stEscCntrGun;
 
 /* 函数声明 */
 void Key_Manager_Init(void);
@@ -40,7 +45,8 @@ void Handle_Page_Navigation(uint8_t key);
 void Handle_Value_Adjustment(uint8_t key);
 void Handle_Gun_Select(uint8_t key);
 void Check_Autotune_Trigger(void);
-void Reset_Key_Counter(void);
+void Check_GunSelect_Trigger(void);
+void Reset_Key_Counter(KeyPressCounter_t *key_counter);
 void Send_UI_Message(MsgType_e type, uint8_t page_id, int16_t value, uint8_t refresh);
 
 #ifdef __cplusplus

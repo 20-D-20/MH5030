@@ -24,8 +24,8 @@ void pid_front_init(PidType *vPID , TuneObjectType *tune, FilterCtx *filter)
 {
     vPID->Sv = 120;                            /* 设定值 */
     vPID->T  = 200;                            /* 采样周期/积分周期 */
-    vPID->deadzone = 0.02;                     /* 设置死区大小 */          
-    vPID->pwmcycle = 1000;                     /* PWM周期 */
+    vPID->deadzone = DEADZONE;                 /* 设置死区大小 */          
+    vPID->pwm_high = FRONT_OUTPUTSTEP;         /* PWM输出上限 */
     vPID->OUT0 = 1;                            /* 输出初值 */
     vPID->C1ms = 0;                            /* 1ms计数器 */
     
@@ -64,8 +64,8 @@ void pid_rear_init(PidType *vPID ,TuneObjectType *tune, FilterCtx *filter)
 {
     vPID->Sv = 120;                            /* 设定值 */
     vPID->T  = 200;                            /* 采样周期/积分周期 */
-    vPID->deadzone = 0.02;                     /* 设置死区大小 */          
-    vPID->pwmcycle = 1000;                     /* PWM周期 */
+    vPID->deadzone = DEADZONE;                 /* 设置死区大小 */          
+    vPID->pwm_high = REAR_OUTPUTSTEP;          /* PWM输出上限 */
     vPID->OUT0 = 1;                            /* 输出初值 */
     vPID->C1ms = 0;                            /* 1ms计数器 */
     
@@ -105,7 +105,17 @@ void TunePretreatment(PidType *vPID, TuneObjectType *tune)
     tune->tuneTimer        = 0;                /* 自整定计时器 */
     tune->startTime        = 0;                /* 开始时间 */
     tune->endTime          = 0;                /* 结束时间 */
-    tune->outputStep       = 1000;             /* 步进输出幅值/输出阶跃d */
+
+    /* 根据枪管加热速度，设置不同的输出阶跃值 */
+    if( tune == &g_stPidFrontAuto)
+    {
+        tune->outputStep  = FRONT_OUTPUTSTEP;  /* 前枪管：输出阶跃d */
+    }
+    else if ( tune == &g_stPidRearAuto)
+    {
+        tune->outputStep  = REAR_OUTPUTSTEP;   /* 腔体：输出阶跃d */
+    }
+   
     tune->tunePeriod       = 200;              /* 步进周期 */
     tune->controllerType   = 1;                /* 控制类型，默认1 */
                                                
@@ -118,7 +128,8 @@ void TunePretreatment(PidType *vPID, TuneObjectType *tune)
     {                                          
         tune->initialStatus  = 0;              
         tune->outputStatus   = 1;              
-    }                                          
+    }
+    
     tune->preEnable         = 0;               /* 预处理使能清零 */                                           
     tune->zeroAcrossCounter = 0;               /* 零点穿越计数清零 */
     tune->riseLagCounter    = 0;               /* 上升滞后计数清零 */
@@ -298,7 +309,7 @@ float combined_filter(FilterCtx *ctx, float new_value)
  */
 float PID_Calc(PidType *vPID,TuneObjectType *tune)
 {
-    if (tune->tuneEnable == 0)                                     /* 仅普通PID模式生效 */
+    if (g_system_status.mode == PID_MODE_RUN)                      /* 仅普通PID模式生效 */
     {
         num_test++;                                                /* 测试计数变量 */
 
@@ -321,9 +332,9 @@ float PID_Calc(PidType *vPID,TuneObjectType *tune)
 
         float out = vPID->Pout + vPID->Iout + vPID->Dout;          /* PID三项求和 */
 
-        if (out > vPID->pwmcycle)
+        if (out > vPID->pwm_high)
         {
-            out = vPID->pwmcycle;                                   /* 输出上限 */
+            out = vPID->pwm_high;                                   /* 输出上限 */
         }
         else if (out <= 0)
         {
@@ -337,7 +348,7 @@ float PID_Calc(PidType *vPID,TuneObjectType *tune)
         vPID->Ek_1 = vPID->Ek;                                      /* 更新上次误差 */
         vPID->OUT = out;                                            /* 记录输出 */
         vPID->last_output = out;                                    /* 记录历史输出 */
-
+ 
         return out;                                                 /* 返回本次输出 */
     }
     return vPID->last_output;                                       /* 如果非普通模式，返回上一次输出 */
@@ -378,7 +389,7 @@ void RelayFeedbackAutoTuning(PidType *vPID, TuneObjectType *tune)
 
             if (tune->riseLagCounter > LAG_PHASE)                    /* 上升阶段持续足够长，才切换输出状态 */
             {
-                vPID->OUT = 1000;                                    /* 输出置为高电平/加热状态 */
+                vPID->OUT = tune->outputStep ;                       /* 输出置为高电平/加热状态 */
 
                 if (tune->outputStatus == 0)                         /* 仅在状态切换瞬间记录 */
                 {
@@ -564,89 +575,7 @@ static void CalculationParameters(PidType *vPID, TuneObjectType *tune)
     vPID->Td = (zn[tune->controllerType][2] * tc);                             /* 计算微分时间Td */
     //#endif
 
-    printf("KP:%4.2f, TI:%4.2f, TD:%4.2f \r\n",vPID->Kp,vPID->Ti,vPID->Td);
+    printf("Add = %#X ,KP:%4.2f, TI:%4.2f, TD:%4.2f \r\n",(u32)&vPID,vPID->Kp,vPID->Ti,vPID->Td);
 
 }
-
-
-
-////pid计算
-//float PID_Calc(float deadzone)
-//{
-//pid.deadzone=	deadzone;
-//	
-//	if(PID_auto.tuneEnable == 0)
-//	{
-//		
-//		
-////		
-////		if(pid.C1ms<(pid.T))  
-//// 	  {
-////    	 return pid.last_output ;
-//// 	  }
-////		
-//		num_test++;
-// 
-//		pid.Ek=pid.Sv-pid.Pv;   
-//		
-//		if ( fabsf(pid.Ek)<= pid.deadzone) {
-//        // 误差在死区内，保持上一次输出，不更新积分项
-
-//        return pid.last_output;  //：保持上一次输出
-//     
-//    }
-//		
-//		
-//		pid.Pout=pid.Kp*pid.Ek;     
-// 
-//		pid.SEk+=pid.Ek;        
-// 
-////		DelEk=pid.Ek-pid.Ek_1; 
-//// 
-////		ti=pid.T/pid.Ti;
-////		ki=ti*pid.Kp;
-
-////		pid.Iout=ki*pid.SEk;  
-
-////		td=pid.Td/pid.T;		
-//// 
-////		kd=pid.Kp*td;
-//// 
-////		pid.Dout=kd*DelEk;   
-//// 
-//////	out= pid.Pout+ pid.Iout+ pid.Dout;
-////	out= pid.Pout+ pid.Iout;
-//			 float ki = pid.Kp * (pid.T / pid.Ti);      // Ki = Kp * T / Ti
-//        pid.Iout = ki * pid.SEk;  
-
-//        float DelEk = pid.Ek - pid.Ek_1;
-//        float kd = pid.Kp * (pid.Td / pid.T);      // Kd = Kp * Td / T
-//        pid.Dout = kd * DelEk;   
-
-//        float out = pid.Pout + pid.Iout +pid.Dout;           // 如果用PID，加上 pid.Dout
-//			 
-//			 
-//			 
-//			 
-//						if(out>pid.pwmcycle)
-//						{
-//							out=pid.pwmcycle;
-//						}
-//						else if(out<=0)
-//						{
-//                            out=pid.OUT0; 
-//						}
-//						else 
-//						{
-//							pid.OUT=out;
-//						}
-//						pid.Ek_1=pid.Ek;  
-//						pid.OUT=out;
-//						pid.last_output = out;
-//					
-
-//						
-//}
-//				
-//}
 
